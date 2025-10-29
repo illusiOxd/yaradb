@@ -8,15 +8,26 @@ import os
 from contextlib import asynccontextmanager
 from starlette.middleware.cors import CORSMiddleware
 import uvicorn
+from datetime import datetime
 
 try:
-    from models.models_init.document_init import StandardDocument, create_document as create_doc_func
+    from models.document import StandardDocument
+    from models.models_init.document_init import create_document as create_doc_func
 except ImportError:
-    print("Ошибка: Не могу найти 'models/models_init/document_init.py'.")
+    print("!!! КРИТИЧЕСКАЯ ОШИБКА: Не могу найти 'models/...' !!!")
 
 
     class StandardDocument(BaseModel):
         id: uuid.UUID
+        version: int = 1
+
+        def is_archived(self) -> bool: return False
+
+        def archive(self): pass
+
+        def get(self, key: str) -> Any: return None
+
+        def calculate_body_hash(self): pass
 
 
     def create_doc_func(name: str, body: Dict[str, Any]) -> None:
@@ -28,6 +39,12 @@ class CreateRequest(BaseModel):
     body: Dict[str, Any]
 
 
+class UpdateRequest(BaseModel):
+    version: int
+    body: Dict[str, Any]
+
+
+
 db_storage: List[StandardDocument] = []
 db_lock = threading.Lock()
 db_index_by_id: Dict[uuid.UUID, StandardDocument] = {}
@@ -37,15 +54,9 @@ STORAGE_FILE = "yaradb_storage.json"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Управляет жизненным циклом:
-    - При СТАРТЕ: Загружает данные из .json в память и строит индекс.
-    - При ВЫКЛЮЧЕНИИ: Сохраняет данные из памяти в .json.
-    """
     global db_storage, db_index_by_id
     print("--- YaraDB: Запуск... ---")
 
-    # --- СТАРТ: Загрузка данных ---
     try:
         if os.path.exists(STORAGE_FILE):
             print(f"--- Загрузка данных из {STORAGE_FILE} ---")
@@ -64,7 +75,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # --- ВЫКЛЮЧЕНИЕ: Сохранение данных ---
     print("\n--- YaraDB: Сохранение данных... ---")
     try:
         with db_lock:
@@ -80,7 +90,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="YaraDB",
     description="Document-based YaraDB API (with JSON Persistence)",
-    version="1.0.1",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -90,13 +100,12 @@ app.add_middleware(
 )
 
 
-
 @app.get("/ping")
 async def root():
     return {"status": "alive"}
 
 
-# --- C: Create (Улучшен) ---
+# --- C: Create ---
 @app.post("/document/create", response_model=StandardDocument)
 async def create_document_endpoint(request_data: CreateRequest):
     new_doc = create_doc_func(
@@ -116,12 +125,8 @@ async def create_document_endpoint(request_data: CreateRequest):
 # --- R: Read (Get by ID) ---
 @app.get("/document/get/{doc_id}", response_model=StandardDocument)
 async def get_document_by_id(doc_id: uuid.UUID):
-    """Получить один документ по его ID (мгновенно, O(1))."""
-
-    # --- Поиск по индексу O(1) (Шаг 2) ---
     with db_lock:
         doc = db_index_by_id.get(doc_id)
-    # ---
 
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -138,12 +143,8 @@ async def find_documents(
         filter_body: Dict[str, Any],
         include_archived: bool = False
 ):
-    """
-    Ищет документы, фильтруя по полям в 'body' (медленный скан, O(n)).
-    """
     results: List[StandardDocument] = []
     with db_lock:
-        # Копируем список, чтобы безопасно итерировать
         storage_copy = list(db_storage)
 
     for doc in storage_copy:
@@ -152,7 +153,7 @@ async def find_documents(
 
         matches = True
         for key, value in filter_body.items():
-            if doc.get(key) != value:
+            if doc.get(key, default=object()) != value:
                 matches = False
                 break
 
@@ -162,12 +163,37 @@ async def find_documents(
     return results
 
 
+# --- 💡 U: Update (Шаг 3) 💡 ---
+@app.put("/document/update/{doc_id}", response_model=StandardDocument)
+async def update_document(doc_id: uuid.UUID, update_data: UpdateRequest):
+    with db_lock:
+        doc = db_index_by_id.get(doc_id)
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        if doc.is_archived():
+            raise HTTPException(status_code=400, detail="Cannot update an archived document")
+
+        if doc.version != update_data.version:
+            raise HTTPException(
+                status_code=409,  # 409 Conflict
+                detail=f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {update_data.version}"
+            )
+
+        now = datetime.now()
+        doc.body = update_data.body
+        doc.version += 1
+        doc.updated_at = now
+
+        doc.calculate_body_hash()
+
+        return doc
+
+
 # --- D: Delete (Archive) ---
 @app.put("/document/archive/{doc_id}", response_model=StandardDocument)
 async def archive_document(doc_id: uuid.UUID):
-    """Выполняет "мягкое удаление" (архивацию) документа."""
-
-    # --- Поиск по индексу O(1) ---
     with db_lock:
         doc = db_index_by_id.get(doc_id)
 
@@ -183,12 +209,11 @@ async def archive_document(doc_id: uuid.UUID):
     raise HTTPException(status_code=404, detail="Document not found")
 
 
-# --- 7. Запуск ---
 if __name__ == "__main__":
-    print("--- Запуск YaraDB (v1) на http://127.0.0.1:8000 ---")
+    print("--- Запуск YaraDB (v1.1) на http://120.0.0.1:8000 ---")
     uvicorn.run(
-        "main_v1:app",
-        host="127.0.0.1",
+        "main:app",
+        host="120.0.0.1",
         port=8000,
         workers=1,
         reload=True,

@@ -4,8 +4,11 @@ import hashlib
 from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Any, Dict
-from interfaces.strategy_interface import IValueProcessor
-from models.types.processors.document_processor import DefaultProcessor, EmailProcessor, AgeProcessor
+
+# --- 💡 ИСПРАВЛЕННЫЕ ИМПОРТЫ 💡 ---
+from models.interfaces.strategy_interface import IValueProcessor
+from models.processors.document_processor import DefaultProcessor, EmailProcessor, AgeProcessor
+# --- 💡 ---
 
 class StandardDocument(BaseModel):
     # --- Header ---
@@ -99,6 +102,3 @@ class StandardDocument(BaseModel):
         self.calculate_body_hash()
 
         print(f"Updated '{value_name}' successfully.")
-
-
-
