@@ -5,10 +5,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Any, Dict
 
-# --- 💡 ИСПРАВЛЕННЫЕ ИМПОРТЫ 💡 ---
 from models.interfaces.strategy_interface import IValueProcessor
 from models.processors.document_processor import DefaultProcessor, EmailProcessor, AgeProcessor
-# --- 💡 ---
 
 class StandardDocument(BaseModel):
     # --- Header ---
@@ -30,7 +28,7 @@ class StandardDocument(BaseModel):
     @model_validator(mode='after')
     def calculate_body_hash(self) -> 'StandardDocument':
         """
-        Корректно вычисляет хеш и сохраняет в 'self.body_hash'
+        Correctly calculates the hash and saves it to 'self.body_hash'
         """
         body_str = json.dumps(self.body, sort_keys=True).encode('utf-8')
         hash_obj = hashlib.sha256(body_str)
@@ -43,35 +41,35 @@ class StandardDocument(BaseModel):
     }
     _default_processor: IValueProcessor = DefaultProcessor()
 
-    # --- Удобные методы ---
+    # --- Convenience Methods ---
 
     def get_id_str(self) -> str:
         """
-        Возвращает ID в виде удобной строки.
+        Returns the ID as a convenient string.
         """
         return str(self.id)
 
     def get(self, key: str, default: Any = None) -> Any:
         """
-        Позволяет легко "заглянуть" внутрь 'body'.
+        Allows easy "peeking" inside the 'body'.
         """
         return self.body.get(key, default)
 
     def pretty(self) -> str:
         """
-        Возвращает "красивый" отформатированный JSON.
+        Returns a "pretty" formatted JSON of the entire document.
         """
         return self.model_dump_json(indent=2, by_alias=True)
 
 
     def is_archived(self) -> bool:
-        """Проверяет, "удален" ли (архивирован) документ."""
+        """Checks if the document is "deleted" (archived)."""
         return self.archived_at is not None
 
     def archive(self) -> None:
         """
-        "Мягко" удаляет (архивирует) документ.
-        Этот метод нужно вызывать из твоего эндпоинта /document/archive/{doc_id}
+        "Soft" deletes (archives) the document.
+        This method should be called from your /document/archive/{doc_id} endpoint
         """
         if not self.is_archived():
             now = datetime.now()
@@ -81,8 +79,8 @@ class StandardDocument(BaseModel):
 
     def update_one_value(self, value_name: str, new_value: Any):
         """
-        Обновляет одно значение, используя 'позднее связывание'
-        для выбора правильного обработчика (Стратегии).
+        Updates a single value using 'late binding'
+        to select the correct handler (Strategy).
         """
 
         processor = self._processors.get(value_name, self._default_processor)
@@ -91,7 +89,7 @@ class StandardDocument(BaseModel):
             processed_value = processor.process(new_value)
 
         except ValueError as e:
-            print(f"Ошибка валидации для '{value_name}': {e}")
+            print(f"Validation error for '{value_name}': {e}")
             return
 
         self.body[value_name] = processed_value
