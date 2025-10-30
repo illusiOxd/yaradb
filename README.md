@@ -232,7 +232,7 @@ SOFTWARE.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) to understand our contribution process and CLA.
+Contributions are welcome! Please read our [CONTRIBUTING.md](.github/CONTRIBUTING.md) to understand our contribution process and CLA.
 
 Feel free to open issues or submit pull requests.
 
