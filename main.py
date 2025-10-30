@@ -13,23 +13,17 @@ from datetime import datetime
 try:
     from models.document import StandardDocument
     from models.models_init.document_init import create_document as create_doc_func
-except ImportError:
-    print("!!! CRITICAL ERROR: Cannot find 'models/...' !!!")
+except ImportError as e:
+    print(f"!!! CRITICAL ERROR: Cannot import models. Check paths. Details: {e} !!!")
+    print("Falling back to stub functions. API will NOT work correctly.")
 
-
-    # Fallback stubs
     class StandardDocument(BaseModel):
         id: uuid.UUID
         version: int = 1
-
         def is_archived(self) -> bool: return False
-
         def archive(self): pass
-
-        def get(self, key: str) -> Any: return None
-
+        def get(self, key: str, default: Any = None) -> Any: return None
         def calculate_body_hash(self): pass
-
 
     def create_doc_func(name: str, body: Dict[str, Any]) -> None:
         return None
@@ -45,7 +39,6 @@ class UpdateRequest(BaseModel):
     body: Dict[str, Any]
 
 
-# --- In-Memory Database ---
 db_storage: List[StandardDocument] = []
 db_lock = threading.Lock()
 db_index_by_id: Dict[uuid.UUID, StandardDocument] = {}
@@ -55,11 +48,6 @@ STORAGE_FILE = "yaradb_storage.json"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Manages the application lifecycle:
-    - On STARTUP: Loads data from .json into memory and builds the index.
-    - On SHUTDOWN: Saves data from memory to .json.
-    """
     global db_storage, db_index_by_id
     print("--- YaraDB: Starting up... ---")
 
@@ -68,7 +56,6 @@ async def lifespan(app: FastAPI):
             print(f"--- Loading data from {STORAGE_FILE} ---")
             with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
                 raw_data = json.load(f)
-
                 for item in raw_data:
                     doc = StandardDocument.model_validate(item)
                     db_storage.append(doc)
@@ -85,7 +72,6 @@ async def lifespan(app: FastAPI):
     try:
         with db_lock:
             data_to_save = [doc.model_dump() for doc in db_storage]
-
         with open(STORAGE_FILE, 'w', encoding='utf-8') as f:
             json.dump(data_to_save, f, indent=2, default=str)
         print("--- Data successfully saved. Exiting. ---")
@@ -111,7 +97,6 @@ async def root():
     return {"status": "alive"}
 
 
-# --- C: Create ---
 @app.post("/document/create", response_model=StandardDocument)
 async def create_document_endpoint(request_data: CreateRequest):
     new_doc = create_doc_func(
@@ -128,10 +113,8 @@ async def create_document_endpoint(request_data: CreateRequest):
     return new_doc
 
 
-# --- R: Read (Get by ID) ---
 @app.get("/document/get/{doc_id}", response_model=StandardDocument)
 async def get_document_by_id(doc_id: uuid.UUID):
-    """Get a single document by its ID (fast, O(1) read)."""
     with db_lock:
         doc = db_index_by_id.get(doc_id)
 
@@ -144,15 +127,11 @@ async def get_document_by_id(doc_id: uuid.UUID):
     return doc
 
 
-# --- R: Read (Find by filter) ---
 @app.post("/document/find", response_model=List[StandardDocument])
 async def find_documents(
         filter_body: Dict[str, Any],
         include_archived: bool = False
 ):
-    """
-    Finds documents by filtering on fields in the 'body' (slow scan, O(n)).
-    """
     results: List[StandardDocument] = []
     with db_lock:
         storage_copy = list(db_storage)
@@ -163,7 +142,7 @@ async def find_documents(
 
         matches = True
         for key, value in filter_body.items():
-            if doc.get(key, default=object()) != value:
+            if doc.body.get(key, default=object()) != value:
                 matches = False
                 break
 
@@ -173,10 +152,8 @@ async def find_documents(
     return results
 
 
-# --- U: Update ---
 @app.put("/document/update/{doc_id}", response_model=StandardDocument)
 async def update_document(doc_id: uuid.UUID, update_data: UpdateRequest):
-    """Updates a document's body, checking for version conflicts."""
     with db_lock:
         doc = db_index_by_id.get(doc_id)
 
@@ -188,11 +165,11 @@ async def update_document(doc_id: uuid.UUID, update_data: UpdateRequest):
 
         if doc.version != update_data.version:
             raise HTTPException(
-                status_code=409,  # 409 Conflict
+                status_code=409,
                 detail=f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {update_data.version}"
             )
 
-        now = datetime.now()
+        now = datetime.now(datetime.UTC)
         doc.body = update_data.body
         doc.version += 1
         doc.updated_at = now
@@ -202,10 +179,8 @@ async def update_document(doc_id: uuid.UUID, update_data: UpdateRequest):
         return doc
 
 
-# --- D: Delete (Archive) ---
 @app.put("/document/archive/{doc_id}", response_model=StandardDocument)
 async def archive_document(doc_id: uuid.UUID):
-    """Performs a "soft delete" (archiving) of the document."""
     with db_lock:
         doc = db_index_by_id.get(doc_id)
 
@@ -231,3 +206,4 @@ if __name__ == "__main__":
         reload=True,
         limit_concurrency=100,
     )
+
