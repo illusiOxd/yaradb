@@ -30,14 +30,50 @@ YaraDB isn't just a "key-value" store. Every document is wrapped in an intellige
 
 ### 1. Run with Docker (Recommended)
 
-*(Coming Soon - Ты можешь добавить Dockerfile позже, как мы обсуждали)*
+This is the easiest and most reliable way to run YaraDB as a service.
 
-### 2. Run Locally
+**1. Build the Docker image:**
+```bash
+docker build -t yaradb .
+```
+
+**2. Run the container (with data persistence):**
+```bash
+# Creates a 'yaradb_data' folder in your current directory for the DB file
+docker run -d -p 8000:8000 -v $(pwd)/yaradb_data:/app --name yaradb_server yaradb
+```
+
+**Flags explanation:**
+- `-d`: Detached mode (runs in background)
+- `-p 8000:8000`: Maps your local port 8000 to the container's port 8000
+- `-v $(pwd)/yaradb_data:/app`: **(IMPORTANT)** Saves your `yaradb_storage.json` file into a `yaradb_data` folder on your host machine, so your data persists even if the container is removed
+- `--name yaradb_server`: A friendly name to make it easy to stop
+
+The server is now running on **http://127.0.0.1:8000**.
+
+**To stop the server:**
+```bash
+docker stop yaradb_server
+```
+
+**To restart:**
+```bash
+docker start yaradb_server
+```
+
+**To remove:**
+```bash
+docker rm yaradb_server
+```
+
+---
+
+### 2. Run Locally (Alternative)
 
 **1. Clone the repo:**
 ```bash
-git clone https://github.com/YOUR_USERNAME/YaraDB.git
-cd YaraDB
+git clone https://github.com/illusiOxd/yaradb.git
+cd yaradb
 ```
 
 **2. Create a virtual environment and install:**
@@ -78,7 +114,7 @@ Creates a new document.
 {
   "_id": "a1b2c3d4-...",
   "name": "user_account",
-  "body": { ... },
+  "body": { "username": "alice", "email": "alice@example.com" },
   "body_hash": "a9f8b...",
   "created_at": "2025-10-29T21:00:00Z",
   "updated_at": null,
@@ -142,7 +178,9 @@ Finds documents using a filter on the body (slow scan, O(n)).
 
 **Response (200 OK):**
 ```json
-[ ...list of StandardDocument objects... ]
+[
+  { ...StandardDocument objects... }
+]
 ```
 
 ---
@@ -168,6 +206,8 @@ The `StandardDocument` with `archived_at` set.
 
 ## 📝 License
 
+**MIT License**
+
 Copyright (c) 2025 Tymofii Shchur Viktorovych
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -192,4 +232,14 @@ SOFTWARE.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+Contributions are welcome! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) to understand our contribution process and CLA.
+
+Feel free to open issues or submit pull requests.
+
+---
+
+## 🔗 Links
+
+- **Documentation**: Coming soon
+- **Issues**: [GitHub Issues](https://github.com/illusiOxd/yaradb/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/illusiOxd/yaradb/discussions)
