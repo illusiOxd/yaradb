@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  yaradb:
+    build: .
+
+    container_name: yaradb_server
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./yaradb_data:/app
+
+    restart: always
