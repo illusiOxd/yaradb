@@ -1,14 +1,14 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 
 from core import wal
 from core import state
 from models.document import StandardDocument
-from models.models_init.document_init import create_document
+from models.models_init.document_init import create_document as init_doc
 
 def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
-    new_doc = create_document(name=name, body=body)
+    new_doc = init_doc(name=name, body=body)
     if new_doc is None:
         raise ValueError("Error creating document (validation failed).")  #
 
@@ -41,7 +41,7 @@ def find_documents(filter_body: Dict[str, Any], include_archived: bool = False) 
 
         matches = True
         for key, value in filter_body.items():
-            if doc.body.get(key, default=object()) != value:
+            if doc.get(key, default=object()) != value:
                 matches = False
                 break
         if matches:
@@ -61,7 +61,7 @@ def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any]) -> St
         if doc.version != version:
             raise ValueError(f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {version}")
 
-        now = datetime.now(datetime.UTC)
+        now = datetime.now(timezone.utc)
         new_version = doc.version + 1
 
         wal_op = {
@@ -77,7 +77,7 @@ def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any]) -> St
         doc.body = body
         doc.version = new_version
         doc.updated_at = now
-        doc.calculate_body_hash()
+        doc._update_body_hash()
 
         return doc
 
@@ -92,7 +92,7 @@ def archive_document(doc_id: uuid.UUID) -> StandardDocument:
             raise ValueError("Document already archived")
 
         new_version = doc.version + 1
-        now = datetime.now(datetime.UTC)
+        now = datetime.now(timezone.utc)
 
         wal_op = {
             "op": "archive",
