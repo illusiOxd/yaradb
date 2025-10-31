@@ -1,2 +1,2 @@
-STORAGE_FILE = "yaradb_storage.json"
-WAL_FILE = "yaradb_wal"
+STORAGE_FILE = "data/yaradb_storage.json"
+WAL_FILE = "data/yaradb_wal"
