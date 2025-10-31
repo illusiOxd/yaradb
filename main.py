@@ -95,12 +95,12 @@ async def archive_document_endpoint(doc_id: uuid.UUID):
 
 
 if __name__ == "__main__":
-    print("--- Starting YaraDB (v2.0 with WAL) on http://127.0.0.1:8000 ---")
+    print("--- Starting YaraDB (v2.0 with WAL) on http://0.0.0.0:8000 ---")
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8000,
         workers=1,
-        reload=True,
+        reload=False,
         limit_concurrency=100,
     )
