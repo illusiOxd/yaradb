@@ -32,15 +32,15 @@ YaraDB isn't just a "key-value" store. Every document is wrapped in an intellige
 
 This is the easiest and most reliable way to run YaraDB as a service.
 
-**1. Build the Docker image:**
+**1. Run the container (with data persistence):**
 ```bash
-docker build -t yaradb .
-```
+# This command automatically downloads the image from Docker Hub
+# and starts the server.
+#
+# It creates a 'yaradb_data' folder in your current directory 
+# to save your database files (WAL + snapshot).
 
-**2. Run the container (with data persistence):**
-```bash
-# Creates a 'yaradb_data' folder in your current directory for the DB file
-docker run -d -p 8000:8000 -v $(pwd)/yaradb_data:/app --name yaradb_server yaradb
+docker run -d -p 8000:8000 -v $(pwd)/yaradb_data:/app --name yaradb_server ashfromsky/yaradb:latest
 ```
 
 **Flags explanation:**
