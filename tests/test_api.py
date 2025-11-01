@@ -131,12 +131,14 @@ def test_update_nonexistent_document(client):
 
 def test_update_archived_document(client):
     """Test updating an archived document"""
+    # Create and archive
     response = client.post("/document/create", json={
         "name": "test", "body": {"data": "test"}
     })
     doc_id = response.json()["_id"]
     client.put(f"/document/archive/{doc_id}")
 
+    # Try to update (should fail - document is hidden when archived)
     response = client.put(f"/document/update/{doc_id}", json={
         "version": 2,
         "body": {"data": "updated"}
@@ -153,4 +155,4 @@ def test_body_hash_integrity(client):
     assert response.status_code == 200
     doc = response.json()
     assert "body_hash" in doc
-    assert len(doc["body_hash"]) == 64
+    assert len(doc["body_hash"]) == 64  # SHA-256 hash length
