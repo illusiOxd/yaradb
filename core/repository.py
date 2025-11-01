@@ -7,15 +7,15 @@ from core import state
 from models.document import StandardDocument
 from models.models_init.document_init import create_document as init_doc
 
-def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
+async def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
     new_doc = init_doc(name=name, body=body)
     if new_doc is None:
-        raise ValueError("Error creating document (validation failed).")  #
+        raise ValueError("Error creating document (validation failed).")
 
     wal_op = {"op": "create", "doc": new_doc.model_dump(by_alias=True)}
 
-    with state.db_lock:
-        wal.log_to_wal(wal_op)
+    async with state.db_lock:
+        await wal.log_to_wal(wal_op)
         state.db_storage.append(new_doc)
         state.db_index_by_id[new_doc.id] = new_doc
 

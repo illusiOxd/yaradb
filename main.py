@@ -3,12 +3,18 @@ from typing import List, Dict, Any
 from pydantic import BaseModel
 import uvicorn
 import uuid
+import logging
 
+from slowapi.errors import RateLimitExceeded
 from core import repository
 from core.lifespan import lifespan
 from models.document import StandardDocument
 from starlette.middleware.cors import CORSMiddleware
 from models.api import CreateRequest, UpdateRequest
+from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+
 
 app = FastAPI(
     title="YaraDB",
@@ -22,6 +28,24 @@ app.add_middleware(
     allow_origins=["*"],
 )
 
+Instrumentator().instrument(app).expose(app)
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("yaradb.log"),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger("yaradb")
 
 
 @app.get("/ping")
@@ -30,12 +54,14 @@ async def root():
 
 
 @app.post("/document/create", response_model=StandardDocument)
+@limiter.limit("10/minute")
 async def create_document_endpoint(request_data: CreateRequest):
     try:
         new_doc = repository.create_document(
             name=request_data.name,
             body=request_data.body
         )
+        logger.info(f"Document created: {new_doc.id}")
         return new_doc
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -44,6 +70,7 @@ async def create_document_endpoint(request_data: CreateRequest):
 
 
 @app.get("/document/get/{doc_id}", response_model=StandardDocument)
+@limiter.limit("10/minute")
 async def get_document_by_id(doc_id: uuid.UUID):
     doc = repository.get_document(doc_id)
     if not doc:
@@ -52,6 +79,7 @@ async def get_document_by_id(doc_id: uuid.UUID):
 
 
 @app.post("/document/find", response_model=List[StandardDocument])
+@limiter.limit("10/minute")
 async def find_documents(
         filter_body: Dict[str, Any],
         include_archived: bool = False
@@ -61,6 +89,7 @@ async def find_documents(
 
 
 @app.put("/document/update/{doc_id}", response_model=StandardDocument)
+@limiter.limit("10/minute")
 async def update_document_endpoint(doc_id: uuid.UUID, update_data: UpdateRequest):
     try:
         updated_doc = repository.update_document(
@@ -68,6 +97,7 @@ async def update_document_endpoint(doc_id: uuid.UUID, update_data: UpdateRequest
             version=update_data.version,
             body=update_data.body
         )
+        logger.info(f"Document updated: {updated_doc.id}")
         return updated_doc
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -81,9 +111,11 @@ async def update_document_endpoint(doc_id: uuid.UUID, update_data: UpdateRequest
 
 
 @app.put("/document/archive/{doc_id}", response_model=StandardDocument)
+@limiter.limit("10/minute")
 async def archive_document_endpoint(doc_id: uuid.UUID):
     try:
         archived_doc = repository.archive_document(doc_id)
+        logger.info(f"Document archived: {archived_doc.id}")
         return archived_doc
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -92,6 +124,14 @@ async def archive_document_endpoint(doc_id: uuid.UUID):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
+@app.post("/document/batch/create")
+async def batch_create(docs: List[CreateRequest]):
+    results = []
+    for req in docs:
+        doc = await repository.create_document(req.name, req.body)
+        results.append(doc)
+    logger.info(f"Batch created: {len(results)} documents")
+    return results
 
 
 if __name__ == "__main__":
