@@ -25,18 +25,12 @@ async def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
     return new_doc
 
 
-async def get_document(doc_id: uuid.UUID) -> StandardDocument | CombinedDocument | None:
+async def get_document(doc_id: uuid.UUID) -> StandardDocument | None:
     async with state.db_lock:
         doc = state.db_index_by_id.get(doc_id)
-
-        if not doc or doc.is_archived():
-            return None
-
-        if isinstance(doc, CombinedDocument):
-            return await get_combined_document(doc_id)
-
-
-        return doc
+        if doc and not doc.is_archived():
+            return doc
+    return None
 
 
 async def find_documents(filter_body: Dict[str, Any], include_archived: bool = False) -> List[StandardDocument]:
@@ -179,7 +173,7 @@ async def combine_documents(name: str, document_ids: List[uuid.UUID],
 
             await wal.log_to_wal(wal_op)
 
-            state.db_storage.append(new_combined_doc)
+            state.db.storage.append(new_combined_doc)
             state.db_index_by_id[new_combined_doc.id] = new_combined_doc
         return new_combined_doc
 
@@ -214,7 +208,6 @@ def _merge_namespace(documents: List[StandardDocument]) -> Dict[str, Any]:
 async def get_combined_document(doc_id: uuid.UUID) -> CombinedDocument | None:
     async with state.db_lock:
         doc = state.db_index_by_id.get(doc_id)
-
 
         if doc and isinstance(doc, CombinedDocument) and not doc.is_archived():
             return doc
