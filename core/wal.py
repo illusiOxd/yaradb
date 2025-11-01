@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import asyncio
 from datetime import datetime
 from fastapi import HTTPException
 
@@ -8,19 +9,23 @@ from core.state import db_storage, db_index_by_id, db_lock, wal_lock
 from models.document import StandardDocument
 from core.constants.main_values import WAL_FILE, STORAGE_FILE
 
-def log_to_wal(operation: dict):
+async def log_to_wal(operation: dict):
     log_entry = json.dumps(operation, default=str) + "\n"
 
     try:
-        with wal_lock:
-            with open(WAL_FILE, 'a', encoding='utf-8') as f:
-                f.write(log_entry)
-                f.flush()
-                os.fsync(f.fileno())
-
+        async with wal_lock:
+            await asyncio.to_thread(_write_wal, log_entry)
     except Exception as e:
         print(f"!!! CRITICAL WAL WRITE FAILED: {e} !!!")
         raise HTTPException(status_code=500, detail=f"Database WAL write error: {e}")
+
+
+def _write_wal(log_entry: str):
+    """Synchronous helper for writing to WAL"""
+    with open(WAL_FILE, 'a', encoding='utf-8') as f:
+        f.write(log_entry)
+        f.flush()
+        os.fsync(f.fileno())
 
 
 def _apply_op_to_memory(op: dict):
@@ -38,7 +43,7 @@ def _apply_op_to_memory(op: dict):
                 doc.body = op["body"]
                 doc.version = op["version"]
                 doc.updated_at = datetime.fromisoformat(op["updated_at"])
-                doc.calculate_body_hash()
+                doc._update_body_hash()
 
         elif op_type == "archive":
             doc_id = uuid.UUID(op["doc_id"])
@@ -91,17 +96,15 @@ def recover_from_wal():
 def perform_checkpoint():
     print("\n--- YaraDB: Shutting down, saving data (Checkpointing)... ---")
     try:
-        with db_lock:
-            with wal_lock:
-                data_to_save = [doc.model_dump(by_alias=True) for doc in db_storage]
-                temp_file = f"{STORAGE_FILE}.tmp"
-                with open(temp_file, 'w', encoding='utf-8') as f:
-                    json.dump(data_to_save, f, default=str)
+        data_to_save = [doc.model_dump(by_alias=True) for doc in db_storage]
+        temp_file = f"{STORAGE_FILE}.tmp"
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(data_to_save, f, default=str)
 
-                os.replace(temp_file, STORAGE_FILE)
+        os.replace(temp_file, STORAGE_FILE)
 
-                with open(WAL_FILE, 'w') as f:
-                    f.truncate(0)
+        with open(WAL_FILE, 'w') as f:
+            f.truncate(0)
 
         print("--- Data successfully checkpointed. WAL cleared. Exiting. ---")
     except Exception as e:

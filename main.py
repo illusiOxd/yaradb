@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from typing import List, Dict, Any
 from pydantic import BaseModel
 import uvicorn
@@ -55,9 +55,9 @@ async def root():
 
 @app.post("/document/create", response_model=StandardDocument)
 @limiter.limit("10/minute")
-async def create_document_endpoint(request_data: CreateRequest):
+async def create_document_endpoint(request: Request, request_data: CreateRequest):
     try:
-        new_doc = repository.create_document(
+        new_doc = await repository.create_document(
             name=request_data.name,
             body=request_data.body
         )
@@ -71,8 +71,8 @@ async def create_document_endpoint(request_data: CreateRequest):
 
 @app.get("/document/get/{doc_id}", response_model=StandardDocument)
 @limiter.limit("10/minute")
-async def get_document_by_id(doc_id: uuid.UUID):
-    doc = repository.get_document(doc_id)
+async def get_document_by_id(request: Request, doc_id: uuid.UUID):
+    doc = await repository.get_document(doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
@@ -81,18 +81,19 @@ async def get_document_by_id(doc_id: uuid.UUID):
 @app.post("/document/find", response_model=List[StandardDocument])
 @limiter.limit("10/minute")
 async def find_documents(
+        request: Request,
         filter_body: Dict[str, Any],
         include_archived: bool = False
 ):
-    results = repository.find_documents(filter_body, include_archived)
+    results = await repository.find_documents(filter_body, include_archived)
     return results
 
 
 @app.put("/document/update/{doc_id}", response_model=StandardDocument)
 @limiter.limit("10/minute")
-async def update_document_endpoint(doc_id: uuid.UUID, update_data: UpdateRequest):
+async def update_document_endpoint(request: Request, doc_id: uuid.UUID, update_data: UpdateRequest):
     try:
-        updated_doc = repository.update_document(
+        updated_doc = await repository.update_document(
             doc_id=doc_id,
             version=update_data.version,
             body=update_data.body
@@ -112,9 +113,9 @@ async def update_document_endpoint(doc_id: uuid.UUID, update_data: UpdateRequest
 
 @app.put("/document/archive/{doc_id}", response_model=StandardDocument)
 @limiter.limit("10/minute")
-async def archive_document_endpoint(doc_id: uuid.UUID):
+async def archive_document_endpoint(request: Request, doc_id: uuid.UUID):
     try:
-        archived_doc = repository.archive_document(doc_id)
+        archived_doc = await repository.archive_document(doc_id)
         logger.info(f"Document archived: {archived_doc.id}")
         return archived_doc
     except LookupError as e:
@@ -125,7 +126,8 @@ async def archive_document_endpoint(doc_id: uuid.UUID):
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 @app.post("/document/batch/create")
-async def batch_create(docs: List[CreateRequest]):
+@limiter.limit("10/minute")
+async def batch_create(request: Request, docs: List[CreateRequest]):
     results = []
     for req in docs:
         doc = await repository.create_document(req.name, req.body)

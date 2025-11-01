@@ -22,17 +22,17 @@ async def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
     return new_doc
 
 
-def get_document(doc_id: uuid.UUID) -> StandardDocument | None:
-    with state.db_lock:
+async def get_document(doc_id: uuid.UUID) -> StandardDocument | None:
+    async with state.db_lock:
         doc = state.db_index_by_id.get(doc_id)
-        if doc and not doc.is_archived():  #
+        if doc and not doc.is_archived():
             return doc
     return None
 
 
-def find_documents(filter_body: Dict[str, Any], include_archived: bool = False) -> List[StandardDocument]:
+async def find_documents(filter_body: Dict[str, Any], include_archived: bool = False) -> List[StandardDocument]:
     results: List[StandardDocument] = []
-    with state.db_lock:
+    async with state.db_lock:
         storage_copy = list(state.db_storage)
 
     for doc in storage_copy:
@@ -50,14 +50,14 @@ def find_documents(filter_body: Dict[str, Any], include_archived: bool = False) 
     return results
 
 
-def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any]) -> StandardDocument:
-    with state.db_lock:
+async def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any]) -> StandardDocument:
+    async with state.db_lock:
         doc = state.db_index_by_id.get(doc_id)
 
         if not doc:
             raise LookupError("Document not found")
         if doc.is_archived():
-            raise ValueError("Cannot update an archived document")
+            raise LookupError("Document not found")
         if doc.version != version:
             raise ValueError(f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {version}")
 
@@ -72,7 +72,7 @@ def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any]) -> St
             "updated_at": now.isoformat()
         }
 
-        wal.log_to_wal(wal_op)
+        await wal.log_to_wal(wal_op)
 
         doc.body = body
         doc.version = new_version
@@ -82,14 +82,14 @@ def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any]) -> St
         return doc
 
 
-def archive_document(doc_id: uuid.UUID) -> StandardDocument:
-    with state.db_lock:
+async def archive_document(doc_id: uuid.UUID) -> StandardDocument:
+    async with state.db_lock:
         doc = state.db_index_by_id.get(doc_id)
 
         if not doc:
             raise LookupError("Document not found")
         if doc.is_archived():
-            raise ValueError("Document already archived")
+            raise LookupError("Document not found")
 
         new_version = doc.version + 1
         now = datetime.now(timezone.utc)
@@ -101,7 +101,7 @@ def archive_document(doc_id: uuid.UUID) -> StandardDocument:
             "updated_at": now.isoformat()
         }
 
-        wal.log_to_wal(wal_op)
+        await wal.log_to_wal(wal_op)
 
         doc.archive()
 

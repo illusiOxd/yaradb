@@ -23,7 +23,9 @@ jobs:
         pip install pytest pytest-asyncio httpx
 
     - name: Run tests
-      run: pytest tests/ -v
+      run: |
+        export PYTHONPATH=$PYTHONPATH:$(pwd)
+        pytest tests/ -v --tb=short
 
   docker:
     needs: test
