@@ -11,3 +11,6 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+conftest.py
+test_import.py
+setup.py
