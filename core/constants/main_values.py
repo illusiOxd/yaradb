@@ -1,2 +1,6 @@
-STORAGE_FILE = "data/yaradb_storage.json"
-WAL_FILE = "data/yaradb_wal"
+import os
+
+DATA_DIR = os.getenv("DATA_DIR", ".")
+
+STORAGE_FILE = os.path.join(DATA_DIR, "yaradb_storage.json")
+WAL_FILE = os.path.join(DATA_DIR, "yaradb_wal")

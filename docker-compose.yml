@@ -2,13 +2,12 @@ version: '3.8'
 
 services:
   yaradb:
-    build: .
+    image: ashfromsky/yaradb:latest
     container_name: yaradb_server
     ports:
       - "8000:8000"
     volumes:
       - ./yaradb_data:/data
     environment:
-      - STORAGE_FILE=/data/yaradb_storage.json
-      - WAL_FILE=/data/yaradb_wal
+      - DATA_DIR=/data
     restart: always
