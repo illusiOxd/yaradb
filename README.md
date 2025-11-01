@@ -3,6 +3,7 @@
 > An intelligent, in-memory-first Document Database with WAL persistence
 
 [📖 **Complete Documentation**](https://github.com/illusiOxd/yaradb/wiki) | 
+[📖 **Notion complete Documentation**](https://www.notion.so/YaraDB-Complete-Documentation-29ed5746db8c80fca39defa67e9d8ef4?source=copy_link) |
 [🚀 Quick Start](https://github.com/illusiOxd/yaradb/wiki/Quick-Start) | 
 [🐳 Docker Hub](https://hub.docker.com/r/ashfromsky/yaradb)
 
