@@ -6,10 +6,7 @@ from fastapi import HTTPException
 
 from core.state import db_storage, db_index_by_id, db_lock, wal_lock
 from models.document import StandardDocument
-
-STORAGE_FILE = "yaradb_storage.json"
-WAL_FILE = "yaradb.wal"
-
+from core.constants.main_values import WAL_FILE, STORAGE_FILE
 
 def log_to_wal(operation: dict):
     log_entry = json.dumps(operation, default=str) + "\n"
