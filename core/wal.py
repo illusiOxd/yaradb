@@ -5,8 +5,9 @@ import asyncio
 from datetime import datetime
 from fastapi import HTTPException
 
-from core.state import db_storage, db_index_by_id, db_lock, wal_lock
-from models.document import StandardDocument
+from core.state import db_storage, db_index_by_id, wal_lock
+from models.document_types.document import StandardDocument
+from models.document_types.combined_document import CombinedDocument
 from core.constants.main_values import WAL_FILE, STORAGE_FILE
 
 async def log_to_wal(operation: dict):
@@ -30,9 +31,16 @@ def _write_wal(log_entry: str):
 
 def _apply_op_to_memory(op: dict):
     op_type = op.get("op")
+
     try:
         if op_type == "create":
             doc = StandardDocument.model_validate(op["doc"])
+            db_storage.append(doc)
+            db_index_by_id[doc.id] = doc
+
+        elif op_type == "create_combined":
+            # Новый тип операции для CombinedDocument
+            doc = CombinedDocument.model_validate(op["doc"])
             db_storage.append(doc)
             db_index_by_id[doc.id] = doc
 
@@ -109,3 +117,4 @@ def perform_checkpoint():
         print("--- Data successfully checkpointed. WAL cleared. Exiting. ---")
     except Exception as e:
         print(f"!!! CRITICAL ERROR while saving DB: {e} !!!")
+

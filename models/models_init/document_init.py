@@ -1,6 +1,6 @@
 from typing import Any, Dict
 from pydantic import ValidationError
-from models.document import StandardDocument
+from models.document_types.document import StandardDocument
 
 def create_document(name: str, body: Dict[str, Any]) -> StandardDocument | None:
     try:
@@ -10,5 +10,5 @@ def create_document(name: str, body: Dict[str, Any]) -> StandardDocument | None:
         )
         return new_doc
     except ValidationError as e:
-        print(f"Ошибка валидации Pydantic: {e}")
+        print(f"Pydantic validation error: {e}")
         return None

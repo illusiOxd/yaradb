@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
 from typing import List, Dict, Any
-from pydantic import BaseModel
 import uvicorn
 import uuid
 import logging
@@ -8,9 +7,10 @@ import logging
 from slowapi.errors import RateLimitExceeded
 from core import repository
 from core.lifespan import lifespan
-from models.document import StandardDocument
+from models.document_types.document import StandardDocument
+from models.document_types.combined_document import CombinedDocument
 from starlette.middleware.cors import CORSMiddleware
-from models.api import CreateRequest, UpdateRequest
+from models.api import CreateRequest, UpdateRequest, CombineRequest
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -134,6 +134,37 @@ async def batch_create(request: Request, docs: List[CreateRequest]):
         results.append(doc)
     logger.info(f"Batch created: {len(results)} documents")
     return results
+
+@app.post("/document/combine", response_model=CombinedDocument)
+@limiter.limit("10/minute")
+async def combine_docs(request: Request, response: CombineRequest):
+    try:
+        combined_doc = await repository.combine_documents(
+            name=CombineRequest.name,
+            document_ids=CombineRequest.document_ids,
+            merge_strategy=CombineRequest.merge_strategy
+        )
+        logger.info(f"Combined document: {combined_doc.id}")
+        return combined_doc
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error combining documents: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@app.get("/document/combined/{doc_id}/sources", response_model=List[StandardDocument])
+@limiter.limit("10/minute")
+async def get_source_documents_endpoint(request: Request, doc_id: uuid.UUID):
+    try:
+        source_docs = await repository.get_source_documents(doc_id)
+        return source_docs
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 if __name__ == "__main__":
