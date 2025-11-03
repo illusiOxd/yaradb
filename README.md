@@ -9,13 +9,13 @@
 
 ## Quick Start
 
-\`\`\`bash
+```bash
 docker run -d -p 8000:8000 \
   -v $(pwd)/yaradb_data:/data \
   -e DATA_DIR=/data \
   --name yaradb_server \
   ashfromsky/yaradb:latest
-\`\`\`
+```
 
 ## Features
 
