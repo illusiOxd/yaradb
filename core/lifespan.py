@@ -15,4 +15,4 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    wal.perform_checkpoint()
+    await wal.perform_checkpoint()
