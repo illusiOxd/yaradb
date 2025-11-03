@@ -5,9 +5,8 @@ import asyncio
 from datetime import datetime
 from fastapi import HTTPException
 
-from core.state import db_storage, db_index_by_id, wal_lock
-from models.document_types.document import StandardDocument
-from models.document_types.combined_document import CombinedDocument
+from core.state import db_storage, db_index_by_id, db_lock, wal_lock
+from models.document import StandardDocument
 from core.constants.main_values import WAL_FILE, STORAGE_FILE
 
 async def log_to_wal(operation: dict):
@@ -21,7 +20,7 @@ async def log_to_wal(operation: dict):
         raise HTTPException(status_code=500, detail=f"Database WAL write error: {e}")
 
 
-def _write_wal(log_entry: str):
+async def _write_wal(log_entry: str):
     """Synchronous helper for writing to WAL"""
     with open(WAL_FILE, 'a', encoding='utf-8') as f:
         f.write(log_entry)
@@ -29,17 +28,12 @@ def _write_wal(log_entry: str):
         os.fsync(f.fileno())
 
 
-def _apply_op_to_memory(op: dict):
+async def _apply_op_to_memory(op: dict):
     op_type = op.get("op")
 
     try:
         if op_type == "create":
             doc = StandardDocument.model_validate(op["doc"])
-            db_storage.append(doc)
-            db_index_by_id[doc.id] = doc
-
-        elif op_type == "create_combined":
-            doc = CombinedDocument.model_validate(op["doc"])
             db_storage.append(doc)
             db_index_by_id[doc.id] = doc
 
@@ -64,7 +58,7 @@ def _apply_op_to_memory(op: dict):
         print(f"Failed to apply WAL op: {op_type}. Error: {e}")
 
 
-def load_snapshot():
+async def load_snapshot():
     try:
         if os.path.exists(STORAGE_FILE):
             print(f"--- Loading data from {STORAGE_FILE} ---")
@@ -82,7 +76,7 @@ def load_snapshot():
         raise e
 
 
-def recover_from_wal():
+async def recover_from_wal():
     if os.path.exists(WAL_FILE):
         print(f"--- Replaying WAL file ({WAL_FILE})... ---")
         replayed_ops = 0
@@ -100,7 +94,7 @@ def recover_from_wal():
         print(f"--- WAL replay complete. {replayed_ops} operations replayed. ---")
 
 
-def perform_checkpoint():
+async def perform_checkpoint():
     print("\n--- YaraDB: Shutting down, saving data (Checkpointing)... ---")
     try:
         data_to_save = [doc.model_dump(by_alias=True) for doc in db_storage]
@@ -117,3 +111,11 @@ def perform_checkpoint():
     except Exception as e:
         print(f"!!! CRITICAL ERROR while saving DB: {e} !!!")
 
+def _write_checkpoint(data_to_save: list, temp_file: str):
+    with open(temp_file, 'w', encoding='utf-8') as f:
+        json.dump(data_to_save, f, default=str)
+
+    os.replace(temp_file, STORAGE_FILE)
+
+    with open(WAL_FILE, 'w') as f:
+        f.truncate(0)
