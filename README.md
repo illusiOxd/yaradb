@@ -132,7 +132,7 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ## 📄 License
 
-MIT © 2025 Tymofii Shchur Viktorovych
+SSPL LICENSE © 2025 Tymofii Shchur Viktorovych
 
 ---
 
