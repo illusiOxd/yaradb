@@ -168,7 +168,7 @@ async def get_source_documents_endpoint(request: Request, doc_id: uuid.UUID):
 
 
 if __name__ == "__main__":
-    print("--- Starting YaraDB (v2.0 with WAL) on http://0.0.0.0:8000 ---")
+    print("--- Starting YaraDB (v3.0) on http://0.0.0.0:8000 ---")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

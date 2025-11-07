@@ -27,18 +27,12 @@ class StandardDocument(BaseModel):
     archived_at: datetime | None = None
 
     def _update_body_hash(self) -> None:
-        """
-        Внутренняя логика для расчета и установки хэша тела.
-        """
         body_str = json.dumps(self.body, sort_keys=True).encode('utf-8')
         hash_obj = hashlib.sha256(body_str)
         self.body_hash = hash_obj.hexdigest()
 
     @model_validator(mode='after')
     def _run_hash_validator(self) -> 'StandardDocument':
-        """
-        Pydantic-валидатор, который вызывает нашу логику хэширования.
-        """
         self._update_body_hash()
         return self
 
