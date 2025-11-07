@@ -39,7 +39,6 @@ def _apply_op_to_memory(op: dict):
             db_index_by_id[doc.id] = doc
 
         elif op_type == "create_combined":
-            # Новый тип операции для CombinedDocument
             doc = CombinedDocument.model_validate(op["doc"])
             db_storage.append(doc)
             db_index_by_id[doc.id] = doc
