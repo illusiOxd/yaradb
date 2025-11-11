@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from core import wal
-
+import asyncio
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,4 +15,4 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    await wal.perform_checkpoint()
+    await asyncio.to_thread(wal.perform_checkpoint)
