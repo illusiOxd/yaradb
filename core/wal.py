@@ -30,7 +30,6 @@ async def _write_wal(log_entry: str):
 
 async def _apply_op_to_memory(op: dict):
     op_type = op.get("op")
-
     try:
         if op_type == "create":
             doc = StandardDocument.model_validate(op["doc"])
@@ -40,7 +39,7 @@ async def _apply_op_to_memory(op: dict):
         elif op_type == "update":
             doc_id = uuid.UUID(op["doc_id"])
             doc = db_index_by_id.get(doc_id)
-            if doc:
+            if doc and isinstance(doc, StandardDocument):
                 doc.body = op["body"]
                 doc.version = op["version"]
                 doc.updated_at = datetime.fromisoformat(op["updated_at"])
@@ -50,6 +49,7 @@ async def _apply_op_to_memory(op: dict):
             doc_id = uuid.UUID(op["doc_id"])
             doc = db_index_by_id.get(doc_id)
             if doc:
+                # 'archive()' works for both btw
                 doc.archive()
                 doc.version = op["version"]
                 doc.updated_at = datetime.fromisoformat(op["updated_at"])
