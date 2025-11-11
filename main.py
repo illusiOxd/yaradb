@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import uvicorn
 import uuid
 import logging
@@ -69,7 +69,7 @@ async def create_document_endpoint(request: Request, request_data: CreateRequest
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@app.get("/document/get/{doc_id}", response_model=StandardDocument)
+@app.get("/document/get/{doc_id}", response_model=Union[StandardDocument, CombinedDocument])
 @limiter.limit("10/minute")
 async def get_document_by_id(request: Request, doc_id: uuid.UUID):
     doc = await repository.get_document(doc_id)
@@ -137,12 +137,12 @@ async def batch_create(request: Request, docs: List[CreateRequest]):
 
 @app.post("/document/combine", response_model=CombinedDocument)
 @limiter.limit("10/minute")
-async def combine_docs(request: Request, response: CombineRequest):
+async def combine_docs(request: Request, payload: CombineRequest):
     try:
         combined_doc = await repository.combine_documents(
-            name=CombineRequest.name,
-            document_ids=CombineRequest.document_ids,
-            merge_strategy=CombineRequest.merge_strategy
+            name=payload.name,
+            document_ids=payload.document_ids,
+            merge_strategy=payload.merge_strategy
         )
         logger.info(f"Combined document: {combined_doc.id}")
         return combined_doc
@@ -155,16 +155,17 @@ async def combine_docs(request: Request, response: CombineRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
-@app.get("/document/combined/{doc_id}/sources", response_model=List[StandardDocument])
-@limiter.limit("10/minute")
-async def get_source_documents_endpoint(request: Request, doc_id: uuid.UUID):
-    try:
-        source_docs = await repository.get_source_documents(doc_id)
-        return source_docs
-    except LookupError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+# this endpoint temporarily commented bc it's not working rn
+# @app.get("/document/combined/{doc_id}/sources", response_model=List[StandardDocument])
+# @limiter.limit("10/minute")
+# async def get_source_documents_endpoint(request: Request, doc_id: uuid.UUID):
+#     try:
+#         source_docs = await repository.get_source_documents(doc_id)
+#         return source_docs
+#     except LookupError as e:
+#         raise HTTPException(status_code=404, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 if __name__ == "__main__":
