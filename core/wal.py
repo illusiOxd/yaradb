@@ -30,6 +30,7 @@ async def _write_wal(log_entry: str):
 
 async def _apply_op_to_memory(op: dict):
     op_type = op.get("op")
+
     try:
         if op_type == "create":
             doc = StandardDocument.model_validate(op["doc"])
