@@ -18,8 +18,8 @@ from slowapi.util import get_remote_address
 
 app = FastAPI(
     title="YaraDB",
-    description="Document-based YaraDB API (v2 with WAL Persistence)",
-    version="2.0.0",
+    description="Document-based YaraDB API (v3 with WAL Persistence)",
+    version="3.0.0",
     lifespan=lifespan
 )
 
