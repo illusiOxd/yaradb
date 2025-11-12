@@ -1,3 +1,6 @@
+![banner 4 jpeg](https://github.com/user-attachments/assets/a9a08190-ee8f-4883-81df-713a3e36c595)
+
+
 # 📦 YaraDB
 
 > An intelligent, in-memory-first Document Database with WAL persistence
