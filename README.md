@@ -207,18 +207,6 @@ For detailed architecture documentation, see the [Architecture Overview](https:/
 
 ---
 
-## 🛣️ Roadmap
-
-- [ ] Query language support (filters, sorting)
-- [ ] Secondary indexes for non-ID lookups
-- [ ] Full-text search capabilities
-- [ ] Replication and clustering
-- [ ] Client libraries (Go, JavaScript, Rust)
-- [ ] Backup and restore utilities
-- [ ] Performance monitoring and metrics
-
----
-
 ## 🤝 Contributing
 
 We welcome contributions from the community! Whether it's bug reports, feature requests, or code contributions, please feel free to get involved.
