@@ -1,5 +1,4 @@
-﻿# models/structure/table.py
-import uuid
+﻿import uuid
 from typing import Dict, Any
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
