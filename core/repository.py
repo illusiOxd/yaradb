@@ -1,4 +1,6 @@
 import uuid
+import json
+
 from datetime import datetime, timezone
 from typing import List, Dict, Any
 from uuid import UUID
@@ -9,11 +11,46 @@ from models.document_types.document import StandardDocument
 from models.document_types.combined_document import CombinedDocument
 from models.models_init.document_init import create_document as init_doc
 from models.models_init.combined_document_init import create_combined_document as init_combined_doc
+from models.structure.table import Table
+from models.api import CreateTableRequest, TableResponse
+from core.constants.main_values import STORAGE_FILE, WAL_FILE
 
-async def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
-    new_doc = init_doc(name=name, body=body)
+
+async def create_document(name: str, body: Dict[str, Any], table_name: str) -> StandardDocument:
+    async with state.db_lock:
+        table = state.db_tables_by_name.get(table_name)
+
+        if not table:
+            table = Table(name=table_name)
+            state.db_tables_by_name[table_name] = table
+
+        if table.settings.get("read_only", False):
+            raise ValueError(f"Table '{table_name}' is READ-ONLY. Cannot create documents.")
+
+        unique_fields = table.settings.get("unique_fields", [])
+        for field in unique_fields:
+            value = body.get(field)
+            if value is not None:
+                if _check_duplicate(table_name, field, value):
+                    raise ValueError(f"Conflict: Value '{value}' for unique field '{field}' already exists.")
+
+    if "schema" in table.settings:
+        try:
+            from jsonschema import validate
+            validate(instance=body, schema=table.settings["schema"])
+        except Exception as e:
+            raise ValueError(f"Schema validation failed: {e}")
+
+    tabledata = {
+        "id": str(table.id),
+        "name": table.name
+    }
+
+    new_doc = init_doc(name=name, body=body,
+                       tabledata=tabledata)
+
     if new_doc is None:
-        raise ValueError("Error creating document (validation failed).")
+        raise ValueError("Error creating document (pydantic validation failed).")
 
     wal_op = {"op": "create", "doc": new_doc.model_dump(by_alias=True)}
 
@@ -21,6 +58,7 @@ async def create_document(name: str, body: Dict[str, Any]) -> StandardDocument:
         await wal.log_to_wal(wal_op)
         state.db_storage.append(new_doc)
         state.db_index_by_id[new_doc.id] = new_doc
+        table.documents_count += 1
 
     return new_doc
 
@@ -69,6 +107,29 @@ async def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any])
             raise LookupError("Document not found")
         if doc.version != version:
             raise ValueError(f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {version}")
+
+        table_name = doc.table_data.get("name") if isinstance(doc.table_data, dict) else None
+
+        if table_name:
+            table = state.db_tables_by_name.get(table_name)
+            if table:
+                if table.settings.get("read_only", False):
+                    raise ValueError(f"Table '{table_name}' is READ-ONLY. Cannot update documents.")
+
+                unique_fields = table.settings.get("unique_fields", [])
+                for field in unique_fields:
+                    if field in body:
+                        new_value = body[field]
+                        if _check_duplicate(table_name, field, new_value, exclude_doc_id=doc_id):
+                            raise ValueError(
+                                f"Conflict: Value '{new_value}' for unique field '{field}' is already taken.")
+
+                if "schema" in table.settings:
+                    try:
+                        from jsonschema import validate
+                        validate(instance=body, schema=table.settings["schema"])
+                    except Exception as e:
+                        raise ValueError(f"Schema validation failed for update: {e}")
 
         now = datetime.now(timezone.utc)
         new_version = doc.version + 1
@@ -238,3 +299,135 @@ async def get_source_documents(combined_doc_id: uuid.UUID) -> List[StandardDocum
 
     return source_docs
 
+
+async def create_new_table(request: CreateTableRequest) -> Table:
+    async with state.db_lock:
+        if request.name in state.db_tables_by_name:
+            raise ValueError(f"Table '{request.name}' already exists.")
+
+        settings = {}
+
+        if request.mode == "strict":
+            if not request.schema_definition:
+                raise ValueError("Strict mode requires a 'schema_definition'!")
+
+            schema = request.schema_definition.copy()
+            schema["additionalProperties"] = False
+            settings["schema"] = schema
+
+        if request.read_only:
+            settings["read_only"] = True
+
+        if hasattr(request, "unique_fields") and request.unique_fields:
+            settings["unique_fields"] = request.unique_fields
+
+        new_table = Table(
+            name=request.name,
+            settings=settings
+        )
+
+        wal_op = {"op": "create_table", "table": new_table.model_dump(by_alias=True)}
+        await wal.log_to_wal(wal_op)
+
+        state.db_tables_by_name[new_table.name] = new_table
+
+        return new_table
+
+
+async def list_tables() -> List[TableResponse]:
+    tables_list = []
+
+    for table in state.db_tables_by_name.values():
+
+        mode = "free"
+        if "schema" in table.settings and table.settings["schema"].get("additionalProperties") is False:
+            mode = "strict"
+
+        is_read_only = table.settings.get("read_only", False)
+
+        tables_list.append(TableResponse(
+            id=table.id,
+            name=table.name,
+            mode=mode,
+            documents_count=table.documents_count,
+            is_read_only=is_read_only,
+            created_at=table.created_at
+        ))
+
+    return tables_list
+
+
+async def get_table_details(name: str) -> Table | None:
+    return state.db_tables_by_name.get(name)
+
+
+async def delete_table(name: str):
+    async with state.db_lock:
+        if name not in state.db_tables_by_name:
+            raise LookupError(f"Table '{name}' not found")
+
+        del state.db_tables_by_name[name]
+
+        wal_op = {"op": "drop_table", "name": name}
+        await wal.log_to_wal(wal_op)
+
+        return True
+
+
+async def get_documents_in_table(table_name: str) -> List[StandardDocument]:
+    results = []
+
+    if table_name not in state.db_tables_by_name:
+        raise LookupError(f"Table '{table_name}' not found")
+
+    async with state.db_lock:
+        for doc in state.db_storage:
+            if doc.is_archived():
+                continue
+
+            doc_table_name = doc.table_data.get("name")
+
+            if doc_table_name == table_name:
+                results.append(doc)
+
+    return results
+
+
+async def wipe_all_data():
+    async with state.db_lock:
+        state.db_storage.clear()
+        state.db_index_by_id.clear()
+        state.db_tables_by_name.clear()
+
+        with open(WAL_FILE, 'w') as f:
+            f.truncate(0)
+
+        empty_state = {"tables": [], "documents": []}
+        with open(STORAGE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(empty_state, f)
+
+    return True
+
+
+def _check_duplicate(table_name: str, field: str, value: Any, exclude_doc_id: uuid.UUID = None) -> bool:
+    if table_name not in state.db_tables_by_name:
+        return False
+
+    for doc in state.db_storage:
+        if doc.is_archived() or doc.id == exclude_doc_id:
+            continue
+
+        doc_table_data = getattr(doc, "table_data", {})
+        if isinstance(doc_table_data, dict):
+            current_table_name = doc_table_data.get("name")
+        else:
+            current_table_name = doc_table_data[1] if isinstance(doc_table_data, list) and len(
+                doc_table_data) > 1 else None
+
+        if current_table_name != table_name:
+            continue
+
+        if doc.body.get(field) == value:
+            return True
+
+    return False
