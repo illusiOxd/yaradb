@@ -13,6 +13,7 @@ class StandardDocument(BaseModel):
     # --- Header ---
     id: uuid.UUID = Field(default_factory=uuid.uuid4, alias="_id")
     name: str
+    table_data: Dict[str, Any] = Field(default_factory=dict)
 
     # --- Body ---
     body: Dict[str, Any]

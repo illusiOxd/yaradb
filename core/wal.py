@@ -9,6 +9,8 @@ from core.state import db_storage, db_index_by_id, wal_lock
 from models.document_types.document import StandardDocument
 from models.document_types.combined_document import CombinedDocument
 from core.constants.main_values import WAL_FILE, STORAGE_FILE
+from core.state import db_tables_by_name
+from models.structure.table import Table
 
 async def log_to_wal(operation: dict):
     log_entry = json.dumps(operation, default=str) + "\n"
@@ -59,6 +61,16 @@ def _apply_op_to_memory(op: dict):
                 doc.archive()
                 doc.version = op["version"]
                 doc.updated_at = datetime.fromisoformat(op["updated_at"])
+        elif op_type == "create_table":
+            from models.structure.table import Table
+            table = Table.model_validate(op["table"])
+            db_tables_by_name[table.name] = table
+            print(f"🔄 Replayed table creation: {table.name}")
+        elif op_type == "drop_table":
+            name = op["name"]
+            if name in db_tables_by_name:
+                del db_tables_by_name[name]
+                print(f"🗑️ Replayed table drop: {name}")
 
     except Exception as e:
         print(f"Failed to apply WAL op: {op_type}. Error: {e}")
@@ -70,13 +82,55 @@ def load_snapshot():
             print(f"--- Loading data from {STORAGE_FILE} ---")
             with open(STORAGE_FILE, 'r', encoding='utf-8') as f:
                 raw_data = json.load(f)
-                for item in raw_data:
-                    doc = StandardDocument.model_validate(item)
-                    db_storage.append(doc)
-                    db_index_by_id[doc.id] = doc
-            print(f"--- Successfully loaded {len(db_storage)} documents from snapshot. ---")
+
+                if isinstance(raw_data, list):
+                    print("⚠️ Detected legacy storage format. Migrating...")
+                    for item in raw_data:
+                        try:
+                            doc = StandardDocument.model_validate(item)
+                            db_storage.append(doc)
+                            db_index_by_id[doc.id] = doc
+                        except Exception as e:
+                            print(f"Skipping invalid doc: {e}")
+
+                elif isinstance(raw_data, dict):
+                    tables_data = raw_data.get("tables", [])
+                    for t_item in tables_data:
+                        try:
+                            table = Table.model_validate(t_item)
+                            table.documents_count = 0
+                            db_tables_by_name[table.name] = table
+                        except Exception as e:
+                            print(f"❌ Failed to load table: {e}")
+
+                    docs_data = raw_data.get("documents", [])
+                    for d_item in docs_data:
+                        try:
+                            doc = StandardDocument.model_validate(d_item)
+                            db_storage.append(doc)
+                            db_index_by_id[doc.id] = doc
+                        except Exception as e:
+                            print(f"❌ Failed to load doc: {e}")
+
+                    print("📊 Recalculating table statistics...")
+                    for doc in db_storage:
+                        if doc.is_archived():
+                            continue
+
+                        t_name = None
+                        if isinstance(doc.table_data, dict):
+                            t_name = doc.table_data.get("name")
+                        elif isinstance(doc.table_data, list) and len(doc.table_data) > 1:
+                            t_name = doc.table_data[1]
+
+                        if t_name and t_name in db_tables_by_name:
+                            db_tables_by_name[t_name].documents_count += 1
+
+                    print(f"--- Loaded: {len(db_tables_by_name)} tables, {len(db_storage)} documents. ---")
+
         else:
             print(f"--- File {STORAGE_FILE} not found. Starting with an empty DB. ---")
+
     except Exception as e:
         print(f"!!! CRITICAL ERROR while loading snapshot: {e} !!!")
         raise e
@@ -101,9 +155,13 @@ def recover_from_wal():
 
 
 def perform_checkpoint():
-    print("\n--- YaraDB: Shutting down, saving data (Checkpointing)... ---")
+    print("\n--- YaraDB: Checkpointing... ---")
     try:
-        data_to_save = [doc.model_dump(by_alias=True) for doc in db_storage]
+        data_to_save = {
+            "tables": [t.model_dump(by_alias=True) for t in db_tables_by_name.values()],
+            "documents": [d.model_dump(by_alias=True) for d in db_storage]
+        }
+
         temp_file = f"{STORAGE_FILE}.tmp"
         with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(data_to_save, f, default=str)
@@ -113,6 +171,6 @@ def perform_checkpoint():
         with open(WAL_FILE, 'w') as f:
             f.truncate(0)
 
-        print("--- Data successfully checkpointed. WAL cleared. Exiting. ---")
+        print("--- Checkpoint successful. ---")
     except Exception as e:
         print(f"!!! CRITICAL ERROR while saving DB: {e} !!!")
