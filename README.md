@@ -124,6 +124,7 @@ docker run -p 8000:8000 ashfromsky/yaradb
 ### 🐳 Docker
 
 ```bash
+docker pull ashfromsky/yaradb:latest
 docker run -d \
   -p 8000:8000 \
   -v $(pwd)/data:/data \
