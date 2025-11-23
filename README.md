@@ -123,11 +123,33 @@ docker run -p 8000:8000 ashfromsky/yaradb
 
 ### 🐳 Docker
 
+**Linux / macOS:**
 ```bash
 docker pull ashfromsky/yaradb:latest
 docker run -d \
+  --name yaradb_server \
   -p 8000:8000 \
   -v $(pwd)/data:/data \
+  ashfromsky/yaradb:latest
+```
+
+**Windows (PowerShell):**
+```powershell
+docker pull ashfromsky/yaradb:latest
+docker run -d `
+  --name yaradb_server `
+  -p 8000:8000 `
+  -v ${PWD}/data:/data `
+  ashfromsky/yaradb:latest
+```
+
+**Windows (CMD):**
+```cmd
+docker pull ashfromsky/yaradb:latest
+docker run -d ^
+  --name yaradb_server ^
+  -p 8000:8000 ^
+  -v %cd%/data:/data ^
   ashfromsky/yaradb:latest
 ```
 
