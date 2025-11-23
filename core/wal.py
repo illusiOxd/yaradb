@@ -98,6 +98,7 @@ def load_snapshot():
                     for t_item in tables_data:
                         try:
                             table = Table.model_validate(t_item)
+                            table.documents_count = 0
                             db_tables_by_name[table.name] = table
                         except Exception as e:
                             print(f"❌ Failed to load table: {e}")
@@ -110,6 +111,20 @@ def load_snapshot():
                             db_index_by_id[doc.id] = doc
                         except Exception as e:
                             print(f"❌ Failed to load doc: {e}")
+
+                    print("📊 Recalculating table statistics...")
+                    for doc in db_storage:
+                        if doc.is_archived():
+                            continue
+
+                        t_name = None
+                        if isinstance(doc.table_data, dict):
+                            t_name = doc.table_data.get("name")
+                        elif isinstance(doc.table_data, list) and len(doc.table_data) > 1:
+                            t_name = doc.table_data[1]
+
+                        if t_name and t_name in db_tables_by_name:
+                            db_tables_by_name[t_name].documents_count += 1
 
                     print(f"--- Loaded: {len(db_tables_by_name)} tables, {len(db_storage)} documents. ---")
 
