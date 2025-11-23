@@ -1,248 +1,576 @@
-![banner 4 jpeg](https://github.com/user-attachments/assets/a9a08190-ee8f-4883-81df-713a3e36c595)
+<div align="center">
+
+<img src="https://github.com/user-attachments/assets/a9a08190-ee8f-4883-81df-713a3e36c595" alt="YaraDB Banner" width="100%">
+
+<h1>
+  <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Card%20File%20Box.png" alt="📦" width="35" height="35" />
+  YaraDB
+</h1>
+
+<h3>🚀 Lightning-fast • 🛡️ Crash-safe • 🎯 Developer-friendly</h3>
+
+<p align="center">
+  <a href="https://hub.docker.com/r/ashfromsky/yaradb">
+    <img src="https://img.shields.io/docker/pulls/ashfromsky/yaradb?style=for-the-badge&logo=docker&logoColor=white&color=0db7ed" alt="Docker Pulls">
+  </a>
+  <a href="https://www.python.org/">
+    <img src="https://img.shields.io/badge/python-3.8+-3776ab?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-SSPL-00ADD8?style=for-the-badge" alt="License">
+  </a>
+  <a href="https://github.com/illusiOxd/yaradb/actions">
+    <img src="https://img.shields.io/github/actions/workflow/status/illusiOxd/yaradb/ci.yml?style=for-the-badge&logo=github" alt="CI/CD">
+  </a>
+</p>
+
+<p align="center">
+  <a href="#-quick-start"><b>Quick Start</b></a> •
+  <a href="https://github.com/illusiOxd/yaradb/wiki"><b>Documentation</b></a> •
+  <a href="https://hub.docker.com/r/ashfromsky/yaradb"><b>Docker Hub</b></a> •
+  <a href="https://github.com/illusiOxd/yaradb-client-py"><b>Python Client</b></a>
+</p>
+
+</div>
+
+<br>
+
+---
 
 <div align="center">
 
-# 📦 YaraDB
+## 💎 What Makes YaraDB Special?
 
-### An intelligent, in-memory-first Document Database with WAL persistence
+</div>
 
-[![Docker Hub](https://img.shields.io/badge/Docker-Hub-blue?logo=docker)](https://hub.docker.com/r/ashfromsky/yaradb)
-[![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-SSPL-green)](LICENSE)
-[![FastAPI](https://img.shields.io/badge/FastAPI-Framework-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+<table>
+<tr>
+<td width="50%" valign="top">
 
-[📖 Documentation](https://github.com/illusiOxd/yaradb/wiki) • 
-[🚀 Quick Start](#-quick-start) • 
-[🎯 Features](#-features) • 
-[🐳 Docker Hub](https://hub.docker.com/r/ashfromsky/yaradb) • 
-[📚 API Reference](https://github.com/illusiOxd/yaradb/wiki/API-Reference)
+### ⚡ **Blazing Performance**
+
+```python
+# O(1) lookups - Always fast
+doc = client.get(doc_id)
+# Sub-millisecond response time
+```
+
+✨ **In-memory operations**  
+✨ **Hash-based indexing**  
+✨ **Zero query overhead**
+
+</td>
+<td width="50%" valign="top">
+
+### 🛡️ **Enterprise Reliability**
+
+```python
+# Crash? No problem.
+# WAL recovery restores everything
+```
+
+✨ **Write-Ahead Logging (WAL)**  
+✨ **Automatic crash recovery**  
+✨ **SHA-256 integrity checks**
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🎯 **Developer Experience**
+
+```python
+# One line to start
+docker run -p 8000:8000 ashfromsky/yaradb
+```
+
+✨ **RESTful API + OpenAPI docs**  
+✨ **Zero configuration**  
+✨ **Native Python client**
+
+</td>
+<td width="50%" valign="top">
+
+### 🔧 **Smart Flexibility**
+
+```python
+# Free mode or strict schemas
+# Your choice, your rules
+```
+
+✨ **Schema-free OR JSON Schema**  
+✨ **Optimistic locking (OCC)**  
+✨ **Soft deletes built-in**
+
+</td>
+</tr>
+</table>
+
+<br>
+
+---
+
+<div align="center">
+
+## 🚀 Get Started in 30 Seconds
+
+</div>
+
+<table>
+<tr>
+<td width="33%" align="center">
+
+### 🐳 Docker
+
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/data:/data \
+  ashfromsky/yaradb:latest
+```
+
+<sub>**Recommended** • Production-ready</sub>
+
+</td>
+<td width="33%" align="center">
+
+### 📦 Docker Compose
+
+```yaml
+services:
+  yaradb:
+    image: ashfromsky/yaradb
+    ports: ["8000:8000"]
+    volumes: ["./data:/data"]
+```
+
+<sub>**Easy** • One command deploy</sub>
+
+</td>
+<td width="33%" align="center">
+
+### 🐍 From Source
+
+```bash
+git clone https://github.com/illusiOxd/yaradb
+cd yaradb
+pip install -r requirements.txt
+python main.py
+```
+
+<sub>**Development** • Full control</sub>
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+
+**Verify it's running:**
+
+```bash
+curl http://localhost:8000/ping
+# {"status":"alive"} ✅
+```
+
+**Explore the API:**  
+👉 **http://localhost:8000/docs** 👈
+
+</div>
+
+<br>
+
+---
+
+<div align="center">
+
+## 💻 Usage Examples
+
+</div>
+
+<table>
+<tr>
+<td width="50%">
+
+### 🌐 REST API
+
+```bash
+# Create a document
+curl -X POST http://localhost:8000/document/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table_name": "users",
+    "body": {
+      "name": "Alice",
+      "email": "alice@example.com",
+      "role": "admin"
+    }
+  }'
+```
+
+```bash
+# Get by ID
+curl http://localhost:8000/document/get/{doc_id}
+```
+
+```bash
+# Update with version control
+curl -X PUT http://localhost:8000/document/update/{doc_id} \
+  -d '{"version": 1, "body": {"name": "Alice Smith"}}'
+```
+
+```bash
+# Soft delete
+curl -X PUT http://localhost:8000/document/archive/{doc_id}
+```
+
+</td>
+<td width="50%">
+
+### 🐍 Python Client
+
+**Install:**
+```bash
+pip install yaradb-client
+```
+
+**Use:**
+```python
+from yaradb_client import YaraClient
+
+client = YaraClient("http://localhost:8000")
+
+# Create
+doc = client.create(
+    table_name="users",
+    body={
+        "name": "Alice",
+        "email": "alice@example.com",
+        "level": 5
+    }
+)
+
+# Read
+user = client.get(doc["_id"])
+
+# Update (with optimistic locking)
+updated = client.update(
+    doc_id=doc["_id"],
+    version=doc["version"],
+    body={"name": "Alice", "level": 6}
+)
+
+# Search
+results = client.find({"level": 6})
+
+# Archive (soft delete)
+client.archive(doc["_id"])
+```
+
+</td>
+</tr>
+</table>
+
+<br>
+
+---
+
+<div align="center">
+
+## 🏗️ How It Works
+
+</div>
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║                      🌐 FastAPI REST API                     ║
+║                   (OpenAPI • JSON • HTTP/2)                  ║
+╚═════════════════════════════╤════════════════════════════════╝
+                              │
+                              ▼
+╔══════════════════════════════════════════════════════════════╗
+║                  💾 In-Memory Hash Index                     ║
+║              { UUID → Document } - O(1) Lookup               ║
+╚═════════════════════════════╤════════════════════════════════╝
+                              │
+                    ┌─────────┴─────────┐
+                    ▼                   ▼
+        ╔═══════════════════╗  ╔═══════════════════╗
+        ║   📝 WAL Engine   ║  ║ 🔐 OCC Locking    ║
+        ║  Append-Only Log  ║  ║ Version Control   ║
+        ╚═════════╤═════════╝  ╚═══════════════════╝
+                  │
+                  ▼
+        ╔═══════════════════╗
+        ║ 💿 JSON Storage   ║
+        ║ Periodic Snapshot ║
+        ╚═══════════════════╝
+```
+
+<table>
+<tr>
+<td align="center" width="25%">
+
+### 🎯 **Write Path**
+
+1. Validate request
+2. Append to WAL
+3. Update memory
+4. Return success
+
+<sub>~2ms latency</sub>
+
+</td>
+<td align="center" width="25%">
+
+### 📖 **Read Path**
+
+1. Hash lookup
+2. Return from RAM
+3. Done!
+
+<sub><1ms latency</sub>
+
+</td>
+<td align="center" width="25%">
+
+### 🔄 **Crash Recovery**
+
+1. Load snapshot
+2. Replay WAL
+3. Rebuild index
+4. Ready!
+
+<sub>Automatic on startup</sub>
+
+</td>
+<td align="center" width="25%">
+
+### 💾 **Checkpoints**
+
+1. Serialize state
+2. Write snapshot
+3. Truncate WAL
+4. Continue
+
+<sub>Background process</sub>
+
+</td>
+</tr>
+</table>
+
+<br>
+
+---
+
+<div align="center">
+
+## 🎯 Perfect For
+
+</div>
+
+<table>
+<tr>
+<td align="center" width="20%">
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Hammer%20and%20Wrench.png" width="50" height="50" alt="🛠️">
+
+### Prototyping
+
+Spin up a database in seconds. No complex setup, no configuration files.
+
+</td>
+<td align="center" width="20%">
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/High%20Voltage.png" width="50" height="50" alt="⚡">
+
+### Real-Time Apps
+
+WebSockets, live dashboards, gaming leaderboards - anywhere speed matters.
+
+</td>
+<td align="center" width="20%">
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Package.png" width="50" height="50" alt="📦">
+
+### Microservices
+
+Lightweight data layer for containerized architectures.
+
+</td>
+<td align="center" width="20%">
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Test%20Tube.png" width="50" height="50" alt="🧪">
+
+### Testing
+
+Fast, ephemeral test databases. Create, test, destroy.
+
+</td>
+<td align="center" width="20%">
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Globe%20Showing%20Europe-Africa.png" width="50" height="50" alt="🌍">
+
+### Edge Computing
+
+Low footprint, works anywhere Docker runs.
+
+</td>
+</tr>
+</table>
+
+<br>
+
+---
+
+<div align="center">
+
+## 📚 Learn More
+
+</div>
+
+<table>
+<tr>
+<td align="center" width="33%">
+
+### 📖 [Complete Documentation](https://github.com/illusiOxd/yaradb/wiki)
+
+Full guides, tutorials, and best practices
+
+</td>
+<td align="center" width="33%">
+
+### 🔌 [API Reference](https://github.com/illusiOxd/yaradb/wiki/API-Reference)
+
+REST endpoints, schemas, and examples
+
+</td>
+<td align="center" width="33%">
+
+### 🏗️ [Architecture Deep Dive](https://github.com/illusiOxd/yaradb/wiki/Architecture)
+
+WAL internals, OCC, and design decisions
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+
+### 🌟 Alternative Resources
+
+[![Notion Docs](https://img.shields.io/badge/Notion-Docs-000000?style=for-the-badge&logo=notion&logoColor=white)](https://www.notion.so/YaraDB-Complete-Documentation-29ed5746db8c80fca39defa67e9d8ef4)
+[![Python Client Repo](https://img.shields.io/badge/GitHub-Python_Client-181717?style=for-the-badge&logo=github)](https://github.com/illusiOxd/yaradb-client-py)
+[![Discussions](https://img.shields.io/badge/GitHub-Discussions-181717?style=for-the-badge&logo=github)](https://github.com/illusiOxd/yaradb/discussions)
+
+</div>
+
+<br>
+
+---
+
+<div align="center">
+
+## 🤝 Contributing
+
+**We ❤️ contributions from the community!**
+
+Whether you're fixing bugs, adding features, improving docs, or sharing ideas — you're welcome here.
+
+</div>
+
+<table>
+<tr>
+<td align="center" width="25%">
+
+### 🐛 Report Bugs
+
+Found an issue?  
+[Open an Issue →](https://github.com/illusiOxd/yaradb/issues/new?template=bug_report.md)
+
+</td>
+<td align="center" width="25%">
+
+### 💡 Request Features
+
+Have an idea?  
+[Share It →](https://github.com/illusiOxd/yaradb/issues/new?template=feature_request.md)
+
+</td>
+<td align="center" width="25%">
+
+### 📝 Improve Docs
+
+Make it clearer  
+[Edit on GitHub →](https://github.com/illusiOxd/yaradb/wiki)
+
+</td>
+<td align="center" width="25%">
+
+### 🔧 Submit Code
+
+Fork • Code • PR  
+[Guidelines →](.github/CONTRIBUTING.md)
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+
+**Read our** [Code of Conduct](.github/CODE_OF_CONDUCT.md) • [Contributing Guide](.github/CONTRIBUTING.md)
+
+</div>
+
+<br>
+
+---
+
+<div align="center">
+
+## 📜 License & Legal
+
+**Server Side Public License (SSPL)**  
+© 2025 Tymofii Shchur Viktorovych
+
+[Read Full License →](LICENSE)
+
+<sub>Free for development and internal use • Contact for commercial SaaS deployment</sub>
 
 </div>
 
 ---
 
-## 📋 Overview
-
-**YaraDB** is a lightweight, high-performance document database built for modern applications. Designed with simplicity and speed in mind, it combines in-memory operations with durable Write-Ahead Logging (WAL) to deliver both performance and reliability.
-
-Perfect for:
-- 🚀 **Rapid prototyping** - Get started in seconds
-- 📊 **Real-time applications** - Ultra-fast O(1) reads
-- 🔄 **Microservices** - Lightweight and containerized
-- 🧪 **Testing environments** - Easy setup and teardown
-
----
-
-## 🎯 Key Features
-
-| Feature | Description |
-|---------|-------------|
-| ⚡ **In-Memory Performance** | Lightning-fast O(1) document retrieval by ID |
-| 💾 **WAL Persistence** | Crash-safe Write-Ahead Logging ensures data durability |
-| 🔐 **Optimistic Concurrency** | Version-based conflict detection prevents data races |
-| 🗑️ **Soft Deletes** | Archive documents without permanent data loss |
-| 🔒 **Data Integrity** | SHA-256 body hashing validates document consistency |
-| 🌐 **RESTful API** | Clean HTTP interface with automatic OpenAPI docs |
-| 🐳 **Docker Ready** | Deploy anywhere with official Docker images |
-| 📦 **Zero Dependencies** | Minimal external requirements for easy integration |
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker (recommended) **OR**
-- Python 3.8+
-
-### 🐳 Option 1: Docker (Recommended)
-
-**Using Docker Run:**
-
-```bash
-# Linux / macOS
-docker run -d -p 8000:8000 \
-  -v $(pwd)/yaradb_data:/data \
-  -e DATA_DIR=/data \
-  --name yaradb_server \
-  ashfromsky/yaradb:latest
-
-# Windows (PowerShell)
-docker run -d -p 8000:8000 -v ${PWD}/yaradb_data:/data -e DATA_DIR=/data --name yaradb_server ashfromsky/yaradb:latest
-```
-
-**Using Docker Compose:**
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  yaradb:
-    image: ashfromsky/yaradb:latest
-    container_name: yaradb_server
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./yaradb_data:/data
-    environment:
-      - DATA_DIR=/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-```bash
-docker-compose up -d
-```
-
-### 🐍 Option 2: Local Development
-
-```bash
-# Clone repository
-git clone https://github.com/illusiOxd/yaradb.git
-cd yaradb
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run server
-python main.py
-```
-
-### ✅ Verify Installation
-
-**Test the server:**
-```bash
-curl http://localhost:8000/ping
-# Expected: {"status":"alive"}
-```
-
-**Access interactive API documentation:**
-```
-http://localhost:8000/docs
-```
-
----
-
-## 💡 Usage Example
-
-```python
-import requests
-
-BASE_URL = "http://localhost:8000"
-
-# Create a document
-response = requests.post(f"{BASE_URL}/db/users", json={
-    "name": "Alice",
-    "email": "alice@example.com",
-    "role": "admin"
-})
-doc = response.json()
-print(f"Created document with ID: {doc['id']}")
-
-# Read a document
-response = requests.get(f"{BASE_URL}/db/users/{doc['id']}")
-print(response.json())
-
-# Update a document
-response = requests.put(f"{BASE_URL}/db/users/{doc['id']}", json={
-    "name": "Alice Smith",
-    "email": "alice@example.com",
-    "role": "admin"
-})
-
-# Delete a document (soft delete)
-response = requests.delete(f"{BASE_URL}/db/users/{doc['id']}")
-```
-
-**For a full-featured Python client, check out [yaradb-client-py](https://github.com/illusiOxd/yaradb-client-py)**
-
----
-
-## 📊 Architecture
-
-YaraDB follows a simple but powerful architecture:
-
-```
-┌─────────────────┐
-│   REST API      │ ← FastAPI (port 8000)
-│   (FastAPI)     │
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│  In-Memory      │ ← O(1) lookups
-│  Document Store │
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│  WAL Engine     │ ← Crash-safe persistence
-│  (Write-Ahead)  │
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│  JSON Files     │ ← Durable storage
-└─────────────────┘
-```
-
-For detailed architecture documentation, see the [Architecture Overview](https://github.com/illusiOxd/yaradb/wiki/Architecture).
-
----
-
-## 📚 Documentation
-
-| Resource | Description |
-|----------|-------------|
-| [📖 Complete Guide](https://github.com/illusiOxd/yaradb/wiki) | Full documentation and tutorials |
-| [📖 Notion Docs](https://www.notion.so/YaraDB-Complete-Documentation-29ed5746db8c80fca39defa67e9d8ef4) | Alternative documentation format |
-| [🔌 API Reference](https://github.com/illusiOxd/yaradb/wiki/API-Reference) | Detailed API endpoint documentation |
-| [🏗️ Architecture](https://github.com/illusiOxd/yaradb/wiki/Architecture) | System design and internals |
-| [🐍 Python Client](https://github.com/illusiOxd/yaradb-client-py) | Official Python client library |
-
----
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Whether it's bug reports, feature requests, or code contributions, please feel free to get involved.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please read our [Contributing Guide](CONTRIBUTING.md) for more details.
-
----
-
-## 📄 License
-
-This project is licensed under the **Server Side Public License (SSPL)**.
-
-© 2025 Tymofii Shchur Viktorovych
-
----
-
-## 🔗 Links & Resources
-
-- [GitHub Repository](https://github.com/illusiOxd/yaradb)
-- [Docker Hub](https://hub.docker.com/r/ashfromsky/yaradb)
-- [Python Client Library](https://github.com/illusiOxd/yaradb-client-py)
-- [Issue Tracker](https://github.com/illusiOxd/yaradb/issues)
-- [Discussions](https://github.com/illusiOxd/yaradb/discussions)
-
----
-
 <div align="center">
 
-**⭐ If you find YaraDB useful, please consider giving it a star!**
+## 🔗 Connect With Us
 
-Made with ❤️ by [illusiOxd](https://github.com/illusiOxd)
+<a href="https://github.com/illusiOxd/yaradb">
+  <img src="https://img.shields.io/badge/GitHub-YaraDB-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
+</a>
+<a href="https://hub.docker.com/r/ashfromsky/yaradb">
+  <img src="https://img.shields.io/badge/Docker_Hub-YaraDB-0db7ed?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Hub">
+</a>
+<a href="https://github.com/illusiOxd/yaradb-client-py">
+  <img src="https://img.shields.io/badge/PyPI-Client-3776ab?style=for-the-badge&logo=python&logoColor=white" alt="PyPI">
+</a>
+<a href="https://github.com/illusiOxd/yaradb/discussions">
+  <img src="https://img.shields.io/badge/Discussions-Join-7057ff?style=for-the-badge&logo=github&logoColor=white" alt="Discussions">
+</a>
+
+<br><br>
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Hand%20gestures/Red%20Heart.png" width="25" height="25" alt="❤️"> **Built with passion by** [**illusiOxd**](https://github.com/illusiOxd)
+
+<br>
+
+<sub>⭐ **Star us on GitHub if YaraDB powers your project!** ⭐</sub>
+
+<br><br>
+
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Star.png" width="20" height="20" alt="✨">
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Star.png" width="20" height="20" alt="✨">
+<img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Star.png" width="20" height="20" alt="✨">
 
 </div>
