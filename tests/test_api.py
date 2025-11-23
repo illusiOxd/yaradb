@@ -1,5 +1,17 @@
 import pytest
 from datetime import datetime
+from main import app
+
+
+@pytest.fixture(autouse=True)
+def disable_rate_limit():
+    """Automatically disable rate limiting for all tests in this module"""
+    if hasattr(app.state, "limiter"):
+        app.state.limiter.enabled = False
+    yield
+    if hasattr(app.state, "limiter"):
+        app.state.limiter.enabled = True
+
 
 TEST_TABLE = "test_table"
 
@@ -259,7 +271,7 @@ def test_delete_table(client):
 
 
 def test_self_destruct(client):
-    response = client.delete("/system/self-destruct", json={
+    response = client.request("DELETE", "/system/self-destruct", json={
         "verification_phrase": "BDaray",
         "safety_pin": datetime.now().year + 1,
         "confirm": True
