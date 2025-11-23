@@ -108,7 +108,11 @@ async def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any])
         if doc.version != version:
             raise ValueError(f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {version}")
 
-        table_name = doc.table_data.get("name") if isinstance(doc.table_data, dict) else None
+        table_name = None
+        if isinstance(doc.table_data, dict):
+            table_name = doc.table_data.get("name")
+        elif isinstance(doc.table_data, list) and len(doc.table_data) > 1:
+            table_name = doc.table_data[1]
 
         if table_name:
             table = state.db_tables_by_name.get(table_name)
