@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime
 from fastapi import HTTPException
 
+from core import state
 from core.state import db_storage, db_index_by_id, wal_lock
 from models.document_types.document import StandardDocument
 from models.document_types.combined_document import CombinedDocument
@@ -72,6 +73,28 @@ def _apply_op_to_memory(op: dict):
                 del db_tables_by_name[name]
                 print(f"🗑️ Replayed table drop: {name}")
 
+        elif op_type == "create_index":
+            table_name = op["table_name"]
+            field = op["field"]
+            index_type = op["index_type"]
+
+            from core.repository import _get_or_create_index_manager
+            index_manager = _get_or_create_index_manager(table_name)
+
+            try:
+                index_manager.create_index(field, index_type)
+                print(f"🔄 Replayed index creation: {table_name}.{field}")
+            except ValueError:
+                pass
+
+        elif op_type == "drop_index":
+            table_name = op["table_name"]
+            field = op["field"]
+
+            if table_name in state.db_table_indexes:
+                state.db_table_indexes[table_name].drop_index(field)
+                print(f"🗑️ Replayed index drop: {table_name}.{field}")
+
     except Exception as e:
         print(f"Failed to apply WAL op: {op_type}. Error: {e}")
 
@@ -126,6 +149,40 @@ def load_snapshot():
                         if t_name and t_name in db_tables_by_name:
                             db_tables_by_name[t_name].documents_count += 1
 
+                    print("--- Rebuilding indexes from snapshot... ---")
+                    from core.indexes import IndexManager
+
+                    for table_name, table in db_tables_by_name.items():
+                        if table.indexes:
+                            print(f"   Building indexes for table '{table_name}'...")
+
+                            if table_name not in state.db_table_indexes:
+                                state.db_table_indexes[table_name] = IndexManager()
+
+                            index_manager = state.db_table_indexes[table_name]
+
+                            for field, idx_type in table.indexes.items():
+                                try:
+                                    index_manager.create_index(field, idx_type)
+                                except ValueError:
+                                    pass
+
+                            docs_in_table = []
+                            for doc in db_storage:
+                                if doc.is_archived():
+                                    continue
+
+                                doc_t_name = None
+                                if isinstance(doc.table_data, dict):
+                                    doc_t_name = doc.table_data.get("name")
+                                elif isinstance(doc.table_data, list) and len(doc.table_data) > 1:
+                                    doc_t_name = doc.table_data[1]
+
+                                if doc_t_name == table_name:
+                                    docs_in_table.append(doc)
+
+                            index_manager.rebuild_all(docs_in_table)
+
                     print(f"--- Loaded: {len(db_tables_by_name)} tables, {len(db_storage)} documents. ---")
 
         else:
@@ -134,7 +191,6 @@ def load_snapshot():
     except Exception as e:
         print(f"!!! CRITICAL ERROR while loading snapshot: {e} !!!")
         raise e
-
 
 def recover_from_wal():
     if os.path.exists(WAL_FILE):
@@ -151,6 +207,14 @@ def recover_from_wal():
                     replayed_ops += 1
                 except Exception as e:
                     print(f"!!! CRITICAL: Failed to replay WAL entry: {line}. Error: {e} !!!")
+        print("--- Rebuilding indexes... ---")
+        for table_name, index_manager in state.db_table_indexes.items():
+            docs_in_table = [
+                doc for doc in db_storage
+                if doc.table_data.get("name") == table_name
+            ]
+            index_manager.rebuild_all(docs_in_table)
+            print(f"✅ Rebuilt indexes for table: {table_name}")
         print(f"--- WAL replay complete. {replayed_ops} operations replayed. ---")
 
 

@@ -15,7 +15,6 @@ def clean_database():
 
     yield
 
-    # Remove files after test
     if os.path.exists(STORAGE_FILE):
         os.remove(STORAGE_FILE)
     if os.path.exists(WAL_FILE):

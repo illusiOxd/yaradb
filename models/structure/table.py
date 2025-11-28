@@ -15,3 +15,8 @@ class Table(BaseModel):
     config_hash: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     documents_count: int = 0
+
+    indexes: Dict[str, str] = Field(
+        default_factory=dict,
+        description="field_name -> index_type mapping"
+    )

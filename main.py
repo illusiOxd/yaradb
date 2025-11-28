@@ -10,12 +10,13 @@ from core.lifespan import lifespan
 from models.document_types.document import StandardDocument
 from models.document_types.combined_document import CombinedDocument
 from starlette.middleware.cors import CORSMiddleware
-from models.api import CreateRequest, UpdateRequest, CombineRequest, CreateTableRequest, TableResponse
+from models.api import CreateRequest, UpdateRequest, CombineRequest, CreateTableRequest, TableResponse, CreateIndexRequest, IndexResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
-from datetime import datetime
+from datetime import datetime, timezone
 from models.api import SelfDestructRequest
+from core import state
 
 app = FastAPI(
     title="YaraDB",
@@ -34,8 +35,6 @@ Instrumentator().instrument(app).expose(app)
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,7 +60,7 @@ async def create_document_endpoint(request: Request, request_data: CreateRequest
         new_doc = await repository.create_document(
             name=request_data.name,
             body=request_data.body,
-            table_name = request_data.table_name
+            table_name=request_data.table_name
         )
         logger.info(f"Document created: {new_doc.id}")
         return new_doc
@@ -85,9 +84,22 @@ async def get_document_by_id(request: Request, doc_id: uuid.UUID):
 async def find_documents(
         request: Request,
         filter_body: Dict[str, Any],
-        include_archived: bool = False
+        table_name: str | None = None,
+        include_archived: bool = False,
+        sort_by: str | None = None,
+        order: str = "asc",
+        limit: int | None = None,
+        offset: int = 0
 ):
-    results = await repository.find_documents(filter_body, include_archived)
+    results = await repository.find_documents(
+        filter_body=filter_body,
+        table_name=table_name,
+        include_archived=include_archived,
+        sort_by=sort_by,
+        order=order,
+        limit=limit,
+        offset=offset
+    )
     return results
 
 
@@ -160,15 +172,17 @@ async def self_destruct_endpoint(payload: SelfDestructRequest):
         logger.error(f"Self-destruct failed: {e}")
         raise HTTPException(status_code=500, detail="Self-destruct mechanism jammed.")
 
+
 @app.post("/document/batch/create")
 @limiter.limit("10/minute")
 async def batch_create(request: Request, docs: List[CreateRequest]):
     results = []
     for req in docs:
-        doc = await repository.create_document(req.name, req.body)
+        doc = await repository.create_document(req.name, req.body, req.table_name)
         results.append(doc)
     logger.info(f"Batch created: {len(results)} documents")
     return results
+
 
 @app.post("/document/combine", response_model=CombinedDocument)
 @limiter.limit("10/minute")
@@ -223,6 +237,7 @@ async def get_table_info(table_name: str):
         raise HTTPException(status_code=404, detail="Table not found")
     return table
 
+
 @app.delete("/table/{table_name}")
 async def delete_table_endpoint(table_name: str):
     try:
@@ -235,6 +250,7 @@ async def delete_table_endpoint(table_name: str):
         logger.error(f"Error deleting table: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/table/{table_name}/documents", response_model=List[StandardDocument])
 async def get_table_content(table_name: str):
     try:
@@ -245,17 +261,95 @@ async def get_table_content(table_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# this endpoint temporarily commented bc it's not working rn
-# @app.get("/document/combined/{doc_id}/sources", response_model=List[StandardDocument])
-# @limiter.limit("10/minute")
-# async def get_source_documents_endpoint(request: Request, doc_id: uuid.UUID):
-#     try:
-#         source_docs = await repository.get_source_documents(doc_id)
-#         return source_docs
-#     except LookupError as e:
-#         raise HTTPException(status_code=404, detail=str(e))
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+@app.post("/table/{table_name}/index/create", response_model=IndexResponse)
+async def create_index_endpoint(table_name: str, req: CreateIndexRequest):
+    try:
+        table = state.db_tables_by_name.get(table_name)
+        if not table:
+            raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found")
+
+        index_manager = repository._get_or_create_index_manager(table_name)
+        index = index_manager.create_index(req.field, req.index_type)
+
+        docs_in_table = [
+            doc for doc in state.db_storage
+            if doc.table_data.get("name") == table_name and not doc.is_archived()
+        ]
+
+        for doc in docs_in_table:
+            index_manager.add_document(doc.id, doc.body)
+
+        table.indexes[req.field] = req.index_type
+
+        from core import wal
+        wal_op = {
+            "op": "create_index",
+            "table_name": table_name,
+            "field": req.field,
+            "index_type": req.index_type
+        }
+        await wal.log_to_wal(wal_op)
+
+        logger.info(f"Index created: {table_name}.{req.field} ({req.index_type})")
+
+        return IndexResponse(
+            table_name=table_name,
+            field=req.field,
+            index_type=req.index_type,
+            created_at=datetime.now(timezone.utc)
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating index: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/table/{table_name}/indexes")
+async def list_indexes_endpoint(table_name: str):
+    table = state.db_tables_by_name.get(table_name)
+    if not table:
+        raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found")
+
+    if table_name not in state.db_table_indexes:
+        return {"indexes": []}
+
+    index_manager = state.db_table_indexes[table_name]
+    stats = index_manager.list_indexes()
+
+    return {"table_name": table_name, "indexes": stats}
+
+
+@app.delete("/table/{table_name}/index/{field}")
+async def drop_index_endpoint(table_name: str, field: str):
+    table = state.db_tables_by_name.get(table_name)
+    if not table:
+        raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found")
+
+    if table_name not in state.db_table_indexes:
+        raise HTTPException(status_code=404, detail=f"No index for field '{field}'")
+
+    index_manager = state.db_table_indexes[table_name]
+
+    if not index_manager.drop_index(field):
+        raise HTTPException(status_code=404, detail=f"No index for field '{field}'")
+
+    if field in table.indexes:
+        del table.indexes[field]
+
+    from core import wal
+    wal_op = {
+        "op": "drop_index",
+        "table_name": table_name,
+        "field": field
+    }
+    await wal.log_to_wal(wal_op)
+
+    logger.info(f"Index dropped: {table_name}.{field}")
+
+    return {"status": "success", "message": f"Index '{field}' dropped"}
 
 
 if __name__ == "__main__":

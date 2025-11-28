@@ -2,7 +2,7 @@ import uuid
 import json
 
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 from uuid import UUID
 
 from core import wal
@@ -14,6 +14,13 @@ from models.models_init.combined_document_init import create_combined_document a
 from models.structure.table import Table
 from models.api import CreateTableRequest, TableResponse
 from core.constants.main_values import STORAGE_FILE, WAL_FILE
+from core.indexes import IndexManager
+
+
+def _get_or_create_index_manager(table_name: str) -> IndexManager:
+    if table_name not in state.db_table_indexes:
+        state.db_table_indexes[table_name] = IndexManager()
+    return state.db_table_indexes[table_name]
 
 
 async def create_document(name: str, body: Dict[str, Any], table_name: str) -> StandardDocument:
@@ -46,8 +53,7 @@ async def create_document(name: str, body: Dict[str, Any], table_name: str) -> S
         "name": table.name
     }
 
-    new_doc = init_doc(name=name, body=body,
-                       tabledata=tabledata)
+    new_doc = init_doc(name=name, body=body, tabledata=tabledata)
 
     if new_doc is None:
         raise ValueError("Error creating document (pydantic validation failed).")
@@ -59,6 +65,9 @@ async def create_document(name: str, body: Dict[str, Any], table_name: str) -> S
         state.db_storage.append(new_doc)
         state.db_index_by_id[new_doc.id] = new_doc
         table.documents_count += 1
+
+        index_manager = _get_or_create_index_manager(table_name)
+        index_manager.add_document(new_doc.id, new_doc.body)
 
     return new_doc
 
@@ -73,26 +82,81 @@ async def get_document(doc_id: uuid.UUID) -> StandardDocument | CombinedDocument
         if isinstance(doc, CombinedDocument):
             return await get_combined_document(doc_id)
 
-
         return doc
 
 
-async def find_documents(filter_body: Dict[str, Any], include_archived: bool = False) -> List[StandardDocument]:
-    results: List[StandardDocument] = []
+async def find_documents(
+        filter_body: Dict[str, Any],
+        table_name: str | None = None,
+        include_archived: bool = False,
+        sort_by: str | None = None,
+        order: str = "asc",
+        limit: int | None = None,
+        offset: int = 0
+) -> List[StandardDocument]:
+    candidates_from_index: Set[uuid.UUID] | None = None
+    used_field: str | None = None
+
+    if table_name and filter_body:
+        index_manager = _get_or_create_index_manager(table_name)
+
+        for field, value in filter_body.items():
+            if index_manager.has_index(field):
+                try:
+                    candidates_from_index = index_manager.query(field, value=value)
+                    used_field = field
+                    print(f"✅ Used index '{field}': {len(candidates_from_index)} candidates")
+                    break
+                except Exception as e:
+                    print(f"⚠️ Index lookup failed for '{field}': {e}")
+
     async with state.db_lock:
-        storage_copy = list(state.db_storage)
+        if candidates_from_index is not None:
+            candidates = [
+                state.db_index_by_id.get(doc_id)
+                for doc_id in candidates_from_index
+            ]
+            candidates = [doc for doc in candidates if doc is not None]
+        else:
+            if filter_body and table_name:
+                print(f"⚠️ No index available for {list(filter_body.keys())}, doing full scan")
+            candidates = list(state.db_storage)
 
-    for doc in storage_copy:
-        if doc.is_archived() and not include_archived:
-            continue
+    if not include_archived:
+        candidates = [doc for doc in candidates if not doc.is_archived()]
 
+    if table_name:
+        candidates = [
+            doc for doc in candidates
+            if doc.table_data.get("name") == table_name
+        ]
+
+    results = []
+    for doc in candidates:
         matches = True
         for key, value in filter_body.items():
-            if doc.get(key, default=object()) != value:
+            doc_value = doc.body.get(key)
+            if doc_value != value:
                 matches = False
                 break
+
         if matches:
             results.append(doc)
+
+    if sort_by:
+        reverse = (order.lower() == "desc")
+        try:
+            results.sort(
+                key=lambda doc: doc.body.get(sort_by),
+                reverse=reverse
+            )
+        except Exception as e:
+            print(f"⚠️ Sort failed: {e}")
+
+    if offset > 0:
+        results = results[offset:]
+    if limit:
+        results = results[:limit]
 
     return results
 
@@ -107,6 +171,8 @@ async def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any])
             raise LookupError("Document not found")
         if doc.version != version:
             raise ValueError(f"Conflict: Document version mismatch. DB is at {doc.version}, you sent {version}")
+
+        old_body = doc.body.copy()
 
         table_name = None
         if isinstance(doc.table_data, dict):
@@ -153,6 +219,10 @@ async def update_document(doc_id: uuid.UUID, version: int, body: Dict[str, Any])
         doc.updated_at = now
         doc._update_body_hash()
 
+        if table_name:
+            index_manager = _get_or_create_index_manager(table_name)
+            index_manager.update_document(doc_id, old_body, body)
+
         return doc
 
 
@@ -164,6 +234,14 @@ async def archive_document(doc_id: uuid.UUID) -> StandardDocument:
             raise LookupError("Document not found")
         if doc.is_archived():
             raise LookupError("Document not found")
+
+        old_body = doc.body.copy()
+
+        table_name = None
+        if isinstance(doc.table_data, dict):
+            table_name = doc.table_data.get("name")
+        elif isinstance(doc.table_data, list) and len(doc.table_data) > 1:
+            table_name = doc.table_data[1]
 
         new_version = doc.version + 1
         now = datetime.now(timezone.utc)
@@ -183,7 +261,12 @@ async def archive_document(doc_id: uuid.UUID) -> StandardDocument:
         doc.updated_at = now
         doc.archived_at = now
 
+        if table_name:
+            index_manager = _get_or_create_index_manager(table_name)
+            index_manager.remove_document(doc_id, old_body)
+
         return doc
+
 
 async def combine_documents(name: str, document_ids: List[uuid.UUID],
                             merge_strategy: str = "overwrite") -> CombinedDocument:
@@ -248,6 +331,7 @@ async def combine_documents(name: str, document_ids: List[uuid.UUID],
             state.db_index_by_id[new_combined_doc.id] = new_combined_doc
         return new_combined_doc
 
+
 def _merge_overwrite(documents: List[StandardDocument]) -> Dict[str, Any]:
     result = {}
     for doc in documents:
@@ -279,7 +363,6 @@ def _merge_namespace(documents: List[StandardDocument]) -> Dict[str, Any]:
 async def get_combined_document(doc_id: uuid.UUID) -> CombinedDocument | None:
     async with state.db_lock:
         doc = state.db_index_by_id.get(doc_id)
-
 
         if doc and isinstance(doc, CombinedDocument) and not doc.is_archived():
             return doc
@@ -372,6 +455,9 @@ async def delete_table(name: str):
 
         del state.db_tables_by_name[name]
 
+        if name in state.db_table_indexes:
+            del state.db_table_indexes[name]
+
         wal_op = {"op": "drop_table", "name": name}
         await wal.log_to_wal(wal_op)
 
@@ -402,6 +488,7 @@ async def wipe_all_data():
         state.db_storage.clear()
         state.db_index_by_id.clear()
         state.db_tables_by_name.clear()
+        state.db_table_indexes.clear()
 
         with open(WAL_FILE, 'w') as f:
             f.truncate(0)
