@@ -17,10 +17,12 @@ def test_full_index_lifecycle(client):
 
     client.post("/document/create", json={
         "table_name": table_name,
+        "name": "u1",
         "body": {"email": "test@example.com", "name": "Test User"}
     })
     client.post("/document/create", json={
         "table_name": table_name,
+        "name": "u2",
         "body": {"email": "other@example.com", "name": "Other User"}
     })
 
@@ -54,6 +56,7 @@ def test_archive_removes_from_index(client):
 
     create_resp = client.post("/document/create", json={
         "table_name": table_name,
+        "name": "doc_arch",
         "body": {"status": "active", "data": 123}
     })
     doc_id = create_resp.json()["_id"]

@@ -300,6 +300,8 @@ async def create_index_endpoint(table_name: str, req: CreateIndexRequest):
             created_at=datetime.now(timezone.utc)
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
